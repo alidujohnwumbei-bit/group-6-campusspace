@@ -1,32 +1,81 @@
 import React from 'react';
-import { useClassroom } from '../context/ClassroomContext';
-import { LayoutGrid, Users, Calendar, Mic, AlertTriangle, History } from 'lucide-react';
+import { useClassroom, AppTab } from '../context/ClassroomContext';
+import { useAuth } from '../context/AuthContext';
+import { 
+  LayoutGrid, 
+  Users, 
+  Calendar, 
+  Mic, 
+  AlertTriangle, 
+  History, 
+  Home, 
+  BookOpen, 
+  ArrowLeftRight, 
+  CheckCircle2, 
+  FileText 
+} from 'lucide-react';
 
 interface BottomNavProps {
   onOpenBookingModal: () => void;
   onOpenEmergencyModal: () => void;
+  onOpenRequestRoomModal?: () => void;
+  onOpenRequestAVModal?: () => void;
+  onOpenSwapModal?: () => void;
 }
 
-export const BottomNav: React.FC<BottomNavProps> = ({ onOpenBookingModal, onOpenEmergencyModal }) => {
-  const { activeTab, setActiveTab, activeEmergencyCount } = useClassroom();
+export const BottomNav: React.FC<BottomNavProps> = ({ 
+  onOpenBookingModal, 
+  onOpenEmergencyModal,
+  onOpenRequestRoomModal,
+  onOpenRequestAVModal,
+  onOpenSwapModal
+}) => {
+  const { activeTab, setActiveTab } = useClassroom();
+  const { role } = useAuth();
 
   interface TabItem {
-    id: string;
+    id: AppTab;
     label: string;
     icon: React.ElementType;
     isAction?: boolean;
+    action?: () => void;
   }
 
-  const tabs: TabItem[] = [
-    { id: 'overview', label: 'Rooms', icon: LayoutGrid },
-    { id: 'occupied', label: 'Occupied', icon: Users },
-    { id: 'book-action', label: 'Book', icon: Calendar, isAction: true },
-    { id: 'audio-gear', label: 'AV Gear', icon: Mic },
-    { id: 'history', label: 'History', icon: History },
-  ];
+  const getTabs = (): TabItem[] => {
+    if (role === 'student') {
+      return [
+        { id: 'dashboard', label: 'Home', icon: Home },
+        { id: 'overview', label: 'Rooms', icon: LayoutGrid },
+        { id: 'book', label: 'Request', icon: Calendar, isAction: true, action: onOpenRequestRoomModal },
+        { id: 'student-requests', label: 'My Status', icon: FileText },
+        { id: 'emergency', label: 'Emergency', icon: AlertTriangle, isAction: true, action: onOpenEmergencyModal },
+      ];
+    }
+
+    if (role === 'lecturer') {
+      return [
+        { id: 'dashboard', label: 'Faculty', icon: Home },
+        { id: 'assigned-courses', label: 'Courses', icon: BookOpen },
+        { id: 'classroom-swaps', label: 'Swaps', icon: ArrowLeftRight, isAction: true, action: onOpenSwapModal },
+        { id: 'overview', label: 'Rooms', icon: LayoutGrid },
+        { id: 'emergency', label: 'Emergency', icon: AlertTriangle, isAction: true, action: onOpenEmergencyModal },
+      ];
+    }
+
+    // Admin
+    return [
+      { id: 'dashboard', label: 'Admin', icon: Home },
+      { id: 'approvals', label: 'Approvals', icon: CheckCircle2 },
+      { id: 'book', label: 'Book', icon: Calendar, isAction: true, action: onOpenBookingModal },
+      { id: 'overview', label: 'Rooms', icon: LayoutGrid },
+      { id: 'emergency', label: 'Dispatch', icon: AlertTriangle, isAction: true, action: onOpenEmergencyModal },
+    ];
+  };
+
+  const tabs = getTabs();
 
   return (
-    <div className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-t border-slate-200 dark:border-slate-800 pb-safe">
+    <div className="xl:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-t border-slate-200 dark:border-slate-800 pb-safe">
       <div className="grid grid-cols-5 items-center h-16 max-w-lg mx-auto">
         {tabs.map((tab) => {
           const Icon = tab.icon;
@@ -36,7 +85,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({ onOpenBookingModal, onOpen
             return (
               <button
                 key={tab.id}
-                onClick={onOpenBookingModal}
+                onClick={tab.action || (() => setActiveTab(tab.id))}
                 className="flex flex-col items-center justify-center h-full min-h-[44px] min-w-[44px] text-slate-700 dark:text-slate-300 active:scale-95 transition-transform"
               >
                 <div className="w-9 h-9 rounded-full bg-indigo-600 flex items-center justify-center text-white shadow-sm -mt-2">
@@ -52,7 +101,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({ onOpenBookingModal, onOpen
           return (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id as typeof activeTab)}
+              onClick={() => setActiveTab(tab.id)}
               className={`flex flex-col items-center justify-center h-full min-h-[44px] min-w-[44px] transition-colors ${
                 isActive
                   ? 'text-indigo-600 dark:text-indigo-400 font-semibold'

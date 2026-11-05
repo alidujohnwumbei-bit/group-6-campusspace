@@ -158,3 +158,106 @@ export interface EmergencyRequest {
   resolvedAt?: string;
   notes?: string;
 }
+
+// ==========================================
+// AUTHENTICATION & MULTI-ROLE SYSTEM TYPES
+// ==========================================
+
+export type UserRole = 'student' | 'lecturer' | 'admin';
+
+export interface User {
+  id: string;
+  email: string;
+  name: string;
+  role: UserRole;
+  department: string;
+  studentId?: string; // e.g. "PS/ITC/23/0042"
+  lecturerTitle?: string; // e.g. "Dr. Adane", "Dr. Nelly"
+  assignedCourseCodes?: string[];
+  avatarUrl?: string;
+}
+
+export interface AVEquipmentRequest {
+  id: string;
+  requestNumber: string; // e.g. "AV-REQ-2026-101"
+  userId: string;
+  userName: string;
+  userRole: UserRole;
+  department: string;
+  classroomId: string;
+  classroomCode: string;
+  equipmentType: 'wireless-handheld-mic' | 'wireless-lapel-mic' | 'auditorium-pa-sound' | 'laser-pointer-clicker' | 'hdmi-dual-adapter' | 'full-av-kit';
+  equipmentName: string;
+  date: string;
+  timeSlot: string;
+  purpose: string;
+  urgency: 'normal' | 'urgent' | 'immediate';
+  status: 'pending' | 'approved' | 'rejected' | 'dispatched';
+  requestedAt: string;
+  adminFeedback?: string;
+}
+
+export interface ClassroomSwapRequest {
+  id: string;
+  requestNumber: string; // e.g. "SWAP-401"
+  requesterLecturer: string;
+  requesterEmail: string;
+  requesterCourseCode: string;
+  requesterCourseName: string;
+  requesterRoomCode: string;
+  targetLecturer: string;
+  targetEmail: string;
+  targetCourseCode: string;
+  targetCourseName: string;
+  targetRoomCode: string;
+  date: string;
+  timeSlot: string;
+  reason: string;
+  status: 'pending' | 'approved' | 'rejected';
+  requestedAt: string;
+  respondedAt?: string;
+  notes?: string;
+}
+
+export interface StudentClassroomRequest {
+  id: string;
+  requestNumber: string; // e.g. "STU-REQ-501"
+  studentId: string;
+  studentName: string;
+  studentIndexNumber: string; // e.g. "PS/ITC/23/0042"
+  department: string;
+  preferredClassroomCode: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+  expectedAttendees: number;
+  purpose: 'Study Group Discussion' | 'Class Project Presentation' | 'Department Association Meeting' | 'Revision & Peer Tutoring' | 'Society / Club Seminar';
+  status: 'pending' | 'approved' | 'rejected';
+  requestedAt: string;
+  adminFeedback?: string;
+  allocatedRoomCode?: string;
+}
+
+export interface DepartmentItem {
+  id: string;
+  name: string;
+  code: string;
+  headOfDepartment: string;
+  contactEmail: string;
+  officeLocation: string;
+  activeLecturersCount: number;
+  assignedCoursesCount: number;
+}
+
+export interface CurriculumCourse {
+  id: string;
+  courseCode: string;
+  courseName: string;
+  instructor: string;
+  department: string;
+  email: string;
+  creditHours: number;
+  scheduledTime: string;
+  defaultRoom: string;
+}
+

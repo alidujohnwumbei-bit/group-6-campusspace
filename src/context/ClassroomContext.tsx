@@ -1,5 +1,20 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { Classroom, Microphone, Speaker, Booking, CancelledBooking, EmergencyRequest, RoomStatus, RoomType, CampusWeather } from '../types';
+import { 
+  Classroom, 
+  Microphone, 
+  Speaker, 
+  Booking, 
+  CancelledBooking, 
+  EmergencyRequest, 
+  RoomStatus, 
+  RoomType, 
+  CampusWeather,
+  AVEquipmentRequest,
+  ClassroomSwapRequest,
+  StudentClassroomRequest,
+  DepartmentItem,
+  CurriculumCourse,
+} from '../types';
 import {
   initialClassrooms,
   initialMicrophones,
@@ -7,6 +22,11 @@ import {
   initialBookings,
   initialCancelledBookings,
   initialEmergencyRequests,
+  initialDepartmentsData,
+  initialCoursesData,
+  initialAVRequestsData,
+  initialSwapRequestsData,
+  initialStudentRequestsData,
 } from '../data/mockData';
 
 export const WEATHER_PRESETS: Record<CampusWeather['condition'], CampusWeather> = {
@@ -71,6 +91,25 @@ interface EmergencyResult {
   allocatedRoom?: Classroom;
 }
 
+export type AppTab = 
+  | 'dashboard'
+  | 'overview' 
+  | 'occupied' 
+  | 'timetable' 
+  | 'book' 
+  | 'history' 
+  | 'emergency' 
+  | 'audio-gear'
+  | 'student-requests'
+  | 'request-av'
+  | 'assigned-courses'
+  | 'classroom-swaps'
+  | 'approvals'
+  | 'manage-classrooms'
+  | 'manage-av'
+  | 'manage-departments'
+  | 'manage-faculty';
+
 interface ClassroomContextType {
   classrooms: Classroom[];
   microphones: Microphone[];
@@ -79,9 +118,35 @@ interface ClassroomContextType {
   cancelledBookings: CancelledBooking[];
   emergencyRequests: EmergencyRequest[];
   
+  // Multi-role Requests & Management State
+  avRequests: AVEquipmentRequest[];
+  createAVRequest: (data: Omit<AVEquipmentRequest, 'id' | 'requestNumber' | 'requestedAt' | 'status'>) => void;
+  updateAVRequestStatus: (id: string, status: AVEquipmentRequest['status'], adminFeedback?: string) => void;
+
+  swapRequests: ClassroomSwapRequest[];
+  createSwapRequest: (data: Omit<ClassroomSwapRequest, 'id' | 'requestNumber' | 'requestedAt' | 'status'>) => void;
+  updateSwapRequestStatus: (id: string, status: ClassroomSwapRequest['status'], notes?: string) => void;
+
+  studentRequests: StudentClassroomRequest[];
+  createStudentRequest: (data: Omit<StudentClassroomRequest, 'id' | 'requestNumber' | 'requestedAt' | 'status'>) => void;
+  updateStudentRequestStatus: (id: string, status: StudentClassroomRequest['status'], adminFeedback?: string, allocatedRoomCode?: string) => void;
+
+  departments: DepartmentItem[];
+  addDepartment: (dept: Omit<DepartmentItem, 'id'>) => void;
+  updateDepartment: (id: string, updates: Partial<DepartmentItem>) => void;
+  deleteDepartment: (id: string) => void;
+
+  courses: CurriculumCourse[];
+  addCourse: (course: Omit<CurriculumCourse, 'id'>) => void;
+  updateCourse: (id: string, updates: Partial<CurriculumCourse>) => void;
+  deleteCourse: (id: string) => void;
+
+  addClassroom: (room: Classroom) => void;
+  updateClassroom: (id: string, updates: Partial<Classroom>) => void;
+  
   // Navigation & Filtering
-  activeTab: 'overview' | 'occupied' | 'timetable' | 'book' | 'history' | 'emergency' | 'audio-gear';
-  setActiveTab: (tab: 'overview' | 'occupied' | 'timetable' | 'book' | 'history' | 'emergency' | 'audio-gear') => void;
+  activeTab: AppTab;
+  setActiveTab: (tab: AppTab) => void;
   selectedRoom: Classroom | null;
   setSelectedRoom: (room: Classroom | null) => void;
   
@@ -157,14 +222,19 @@ interface ClassroomContextType {
 const ClassroomContext = createContext<ClassroomContextType | undefined>(undefined);
 
 const STORAGE_KEYS = {
-  CLASSROOMS: 'campus_nlt_21_v5_classrooms',
-  MICS: 'campus_nlt_21_v5_mics',
-  SPEAKERS: 'campus_nlt_21_v5_speakers',
-  BOOKINGS: 'campus_nlt_21_v5_bookings',
-  CANCELLED: 'campus_nlt_21_v5_cancelled',
-  EMERGENCY: 'campus_nlt_21_v5_emergency',
-  THEME: 'campus_nlt_21_v5_theme',
-  WEATHER: 'campus_nlt_21_v5_weather',
+  CLASSROOMS: 'campus_nlt_21_v6_classrooms',
+  MICS: 'campus_nlt_21_v6_mics',
+  SPEAKERS: 'campus_nlt_21_v6_speakers',
+  BOOKINGS: 'campus_nlt_21_v6_bookings',
+  CANCELLED: 'campus_nlt_21_v6_cancelled',
+  EMERGENCY: 'campus_nlt_21_v6_emergency',
+  THEME: 'campus_nlt_21_v6_theme',
+  WEATHER: 'campus_nlt_21_v6_weather',
+  AV_REQUESTS: 'campus_nlt_21_v6_av_requests',
+  SWAP_REQUESTS: 'campus_nlt_21_v6_swap_requests',
+  STUDENT_REQUESTS: 'campus_nlt_21_v6_student_requests',
+  DEPARTMENTS: 'campus_nlt_21_v6_departments',
+  COURSES: 'campus_nlt_21_v6_courses',
 };
 
 export const ClassroomProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -279,8 +349,70 @@ export const ClassroomProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   }, [emergencyRequests]);
 
   // Tab & Filters
-  const [activeTab, setActiveTab] = useState<'overview' | 'occupied' | 'timetable' | 'book' | 'history' | 'emergency' | 'audio-gear'>('overview');
+  const [activeTab, setActiveTab] = useState<AppTab>('dashboard');
   const [selectedRoom, setSelectedRoom] = useState<Classroom | null>(null);
+
+  // Multi-role Requests & Management State
+  const [avRequests, setAVRequests] = useState<AVEquipmentRequest[]>(() => {
+    const saved = localStorage.getItem(STORAGE_KEYS.AV_REQUESTS);
+    if (saved) {
+      try { return JSON.parse(saved); } catch (e) { console.error(e); }
+    }
+    return initialAVRequestsData;
+  });
+
+  const [swapRequests, setSwapRequests] = useState<ClassroomSwapRequest[]>(() => {
+    const saved = localStorage.getItem(STORAGE_KEYS.SWAP_REQUESTS);
+    if (saved) {
+      try { return JSON.parse(saved); } catch (e) { console.error(e); }
+    }
+    return initialSwapRequestsData;
+  });
+
+  const [studentRequests, setStudentRequests] = useState<StudentClassroomRequest[]>(() => {
+    const saved = localStorage.getItem(STORAGE_KEYS.STUDENT_REQUESTS);
+    if (saved) {
+      try { return JSON.parse(saved); } catch (e) { console.error(e); }
+    }
+    return initialStudentRequestsData;
+  });
+
+  const [departments, setDepartments] = useState<DepartmentItem[]>(() => {
+    const saved = localStorage.getItem(STORAGE_KEYS.DEPARTMENTS);
+    if (saved) {
+      try { return JSON.parse(saved); } catch (e) { console.error(e); }
+    }
+    return initialDepartmentsData;
+  });
+
+  const [courses, setCourses] = useState<CurriculumCourse[]>(() => {
+    const saved = localStorage.getItem(STORAGE_KEYS.COURSES);
+    if (saved) {
+      try { return JSON.parse(saved); } catch (e) { console.error(e); }
+    }
+    return initialCoursesData;
+  });
+
+  // Persist multi-role state
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.AV_REQUESTS, JSON.stringify(avRequests));
+  }, [avRequests]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.SWAP_REQUESTS, JSON.stringify(swapRequests));
+  }, [swapRequests]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.STUDENT_REQUESTS, JSON.stringify(studentRequests));
+  }, [studentRequests]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.DEPARTMENTS, JSON.stringify(departments));
+  }, [departments]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.COURSES, JSON.stringify(courses));
+  }, [courses]);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [buildingFilter, setBuildingFilter] = useState('All');
@@ -812,6 +944,185 @@ export const ClassroomProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     playAudioDiagnostic('ping');
   };
 
+  // Request Handlers
+  const createAVRequest = (data: Omit<AVEquipmentRequest, 'id' | 'requestNumber' | 'requestedAt' | 'status'>) => {
+    const newReq: AVEquipmentRequest = {
+      ...data,
+      id: `av-req-${Date.now()}`,
+      requestNumber: `AV-REQ-${Math.floor(100 + Math.random() * 900)}`,
+      requestedAt: new Date().toISOString(),
+      status: 'pending',
+    };
+    setAVRequests(prev => [newReq, ...prev]);
+  };
+
+  const updateAVRequestStatus = (id: string, status: AVEquipmentRequest['status'], adminFeedback?: string) => {
+    setAVRequests(prev => prev.map(req => {
+      if (req.id === id) {
+        return {
+          ...req,
+          status,
+          adminFeedback: adminFeedback !== undefined ? adminFeedback : req.adminFeedback,
+        };
+      }
+      return req;
+    }));
+  };
+
+  const createSwapRequest = (data: Omit<ClassroomSwapRequest, 'id' | 'requestNumber' | 'requestedAt' | 'status'>) => {
+    const newSwap: ClassroomSwapRequest = {
+      ...data,
+      id: `swap-req-${Date.now()}`,
+      requestNumber: `SWAP-NLT-${Math.floor(200 + Math.random() * 800)}`,
+      requestedAt: new Date().toISOString(),
+      status: 'pending',
+    };
+    setSwapRequests(prev => [newSwap, ...prev]);
+  };
+
+  const updateSwapRequestStatus = (id: string, status: ClassroomSwapRequest['status'], notes?: string) => {
+    setSwapRequests(prev => prev.map(swap => {
+      if (swap.id === id) {
+        return {
+          ...swap,
+          status,
+          notes: notes || swap.notes,
+          respondedAt: new Date().toISOString(),
+        };
+      }
+      return swap;
+    }));
+
+    // If approved, perform actual classroom swap
+    if (status === 'approved') {
+      const targetSwap = swapRequests.find(s => s.id === id);
+      if (targetSwap) {
+        setClassrooms(prev => {
+          const roomA = prev.find(r => r.code === targetSwap.requesterRoomCode);
+          const roomB = prev.find(r => r.code === targetSwap.targetRoomCode);
+          if (!roomA || !roomB) return prev;
+
+          const sessionA = roomA.currentSession;
+          const sessionB = roomB.currentSession;
+
+          return prev.map(r => {
+            if (r.code === targetSwap.requesterRoomCode) {
+              return { ...r, currentSession: sessionB, status: sessionB ? 'occupied' : 'available' };
+            }
+            if (r.code === targetSwap.targetRoomCode) {
+              return { ...r, currentSession: sessionA, status: sessionA ? 'occupied' : 'available' };
+            }
+            return r;
+          });
+        });
+      }
+    }
+  };
+
+  const createStudentRequest = (data: Omit<StudentClassroomRequest, 'id' | 'requestNumber' | 'requestedAt' | 'status'>) => {
+    const newReq: StudentClassroomRequest = {
+      ...data,
+      id: `stu-req-${Date.now()}`,
+      requestNumber: `STU-REQ-${Math.floor(300 + Math.random() * 700)}`,
+      requestedAt: new Date().toISOString(),
+      status: 'pending',
+    };
+    setStudentRequests(prev => [newReq, ...prev]);
+  };
+
+  const updateStudentRequestStatus = (
+    id: string, 
+    status: StudentClassroomRequest['status'], 
+    adminFeedback?: string, 
+    allocatedRoomCode?: string
+  ) => {
+    setStudentRequests(prev => prev.map(req => {
+      if (req.id === id) {
+        return {
+          ...req,
+          status,
+          adminFeedback: adminFeedback || req.adminFeedback,
+          allocatedRoomCode: allocatedRoomCode || req.allocatedRoomCode || req.preferredClassroomCode,
+        };
+      }
+      return req;
+    }));
+
+    // If approved, mark the room as reserved with the student session
+    if (status === 'approved') {
+      const req = studentRequests.find(r => r.id === id);
+      if (req) {
+        const roomCode = allocatedRoomCode || req.preferredClassroomCode;
+        setClassrooms(prev => prev.map(r => {
+          if (r.code === roomCode && (r.status === 'available' || r.status === 'reserved')) {
+            return {
+              ...r,
+              status: 'reserved',
+              currentSession: {
+                id: `sess-stu-${req.id}`,
+                courseCode: 'STUDENT-SESSION',
+                courseName: `${req.purpose} (${req.studentName})`,
+                instructor: `${req.studentName} [${req.studentIndexNumber}]`,
+                department: req.department,
+                startTime: req.startTime,
+                endTime: req.endTime,
+                attendeeCount: req.expectedAttendees,
+                requiresMics: false,
+                requiresSpeakers: false,
+                isReservation: true,
+                bookingRef: req.requestNumber,
+              },
+            };
+          }
+          return r;
+        }));
+      }
+    }
+  };
+
+  // Department Management Handlers
+  const addDepartment = (dept: Omit<DepartmentItem, 'id'>) => {
+    const newDept: DepartmentItem = {
+      ...dept,
+      id: `dept-${Date.now()}`,
+    };
+    setDepartments(prev => [...prev, newDept]);
+  };
+
+  const updateDepartment = (id: string, updates: Partial<DepartmentItem>) => {
+    setDepartments(prev => prev.map(d => (d.id === id ? { ...d, ...updates } : d)));
+  };
+
+  const deleteDepartment = (id: string) => {
+    setDepartments(prev => prev.filter(d => d.id !== id));
+  };
+
+  // Course & Faculty Management Handlers
+  const addCourse = (course: Omit<CurriculumCourse, 'id'>) => {
+    const newCourse: CurriculumCourse = {
+      ...course,
+      id: `course-${Date.now()}`,
+    };
+    setCourses(prev => [...prev, newCourse]);
+  };
+
+  const updateCourse = (id: string, updates: Partial<CurriculumCourse>) => {
+    setCourses(prev => prev.map(c => (c.id === id ? { ...c, ...updates } : c)));
+  };
+
+  const deleteCourse = (id: string) => {
+    setCourses(prev => prev.filter(c => c.id !== id));
+  };
+
+  // Classroom Management Handlers
+  const addClassroom = (room: Classroom) => {
+    setClassrooms(prev => [...prev, room]);
+  };
+
+  const updateClassroom = (id: string, updates: Partial<Classroom>) => {
+    setClassrooms(prev => prev.map(r => (r.id === id ? { ...r, ...updates } : r)));
+  };
+
   // Reset demo data to defaults
   const resetToDefaults = () => {
     localStorage.removeItem(STORAGE_KEYS.CLASSROOMS);
@@ -820,6 +1131,11 @@ export const ClassroomProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     localStorage.removeItem(STORAGE_KEYS.BOOKINGS);
     localStorage.removeItem(STORAGE_KEYS.CANCELLED);
     localStorage.removeItem(STORAGE_KEYS.EMERGENCY);
+    localStorage.removeItem(STORAGE_KEYS.AV_REQUESTS);
+    localStorage.removeItem(STORAGE_KEYS.SWAP_REQUESTS);
+    localStorage.removeItem(STORAGE_KEYS.STUDENT_REQUESTS);
+    localStorage.removeItem(STORAGE_KEYS.DEPARTMENTS);
+    localStorage.removeItem(STORAGE_KEYS.COURSES);
 
     setClassrooms(initialClassrooms);
     setMicrophones(initialMicrophones);
@@ -827,6 +1143,11 @@ export const ClassroomProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     setBookings(initialBookings);
     setCancelledBookings(initialCancelledBookings);
     setEmergencyRequests(initialEmergencyRequests);
+    setAVRequests(initialAVRequestsData);
+    setSwapRequests(initialSwapRequestsData);
+    setStudentRequests(initialStudentRequestsData);
+    setDepartments(initialDepartmentsData);
+    setCourses(initialCoursesData);
     setSimulatedTime('10:15');
   };
 
@@ -839,6 +1160,25 @@ export const ClassroomProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         bookings,
         cancelledBookings,
         emergencyRequests,
+        avRequests,
+        createAVRequest,
+        updateAVRequestStatus,
+        swapRequests,
+        createSwapRequest,
+        updateSwapRequestStatus,
+        studentRequests,
+        createStudentRequest,
+        updateStudentRequestStatus,
+        departments,
+        addDepartment,
+        updateDepartment,
+        deleteDepartment,
+        courses,
+        addCourse,
+        updateCourse,
+        deleteCourse,
+        addClassroom,
+        updateClassroom,
         activeTab,
         setActiveTab,
         selectedRoom,

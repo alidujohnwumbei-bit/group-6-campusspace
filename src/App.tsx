@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
+import { AuthProvider, useAuth } from './context/AuthContext';
 import { ClassroomProvider, useClassroom } from './context/ClassroomContext';
+import { LoginPage } from './components/LoginPage';
 import { LiveWeatherTimeBar } from './components/LiveWeatherTimeBar';
 import { Navbar } from './components/Navbar';
 import { BottomNav } from './components/BottomNav';
@@ -11,20 +13,30 @@ import { TimetableView } from './components/TimetableView';
 import { BookingsHistoryView } from './components/BookingsHistoryView';
 import { AudioEquipmentView } from './components/AudioEquipmentView';
 import { EmergencyDispatchView } from './components/EmergencyDispatchView';
+import { StudentDashboard } from './components/StudentDashboard';
+import { LecturerDashboard } from './components/LecturerDashboard';
+import { AdminDashboard } from './components/AdminDashboard';
 import { BookingModal } from './components/BookingModal';
 import { EmergencyRequestModal } from './components/EmergencyRequestModal';
 import { ClassroomDetailModal } from './components/ClassroomDetailModal';
 import { CancelClassModal } from './components/CancelClassModal';
+import { StudentRequestRoomModal } from './components/StudentRequestRoomModal';
+import { RequestAVModal } from './components/RequestAVModal';
+import { ClassroomSwapsModal } from './components/ClassroomSwapsModal';
 import { Classroom } from './types';
 import { CheckCircle2, X } from 'lucide-react';
 
 const MainLayout: React.FC = () => {
   const { activeTab, setActiveTab } = useClassroom();
+  const { user, role } = useAuth();
 
   // Modals state
   const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
   const [isEmergencyModalOpen, setIsEmergencyModalOpen] = useState(false);
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
+  const [isStudentRoomModalOpen, setIsStudentRoomModalOpen] = useState(false);
+  const [isRequestAVModalOpen, setIsRequestAVModalOpen] = useState(false);
+  const [isSwapModalOpen, setIsSwapModalOpen] = useState(false);
 
   const [selectedRoomForBooking, setSelectedRoomForBooking] = useState<Classroom | null>(null);
   const [selectedRoomForEmergency, setSelectedRoomForEmergency] = useState<Classroom | null>(null);
@@ -67,10 +79,13 @@ const MainLayout: React.FC = () => {
       {/* Live Time Display & Weather Bar with Adaptive Advisories */}
       <LiveWeatherTimeBar />
 
-      {/* Top Navigation Bar */}
+      {/* Top Navigation Bar with Role Switcher & User Profile */}
       <Navbar
         onOpenEmergencyModal={() => handleOpenEmergencyModal()}
         onOpenBookingModal={() => handleOpenBookingModal()}
+        onOpenRequestRoomModal={() => setIsStudentRoomModalOpen(true)}
+        onOpenRequestAVModal={() => setIsRequestAVModalOpen(true)}
+        onOpenSwapModal={() => setIsSwapModalOpen(true)}
       />
 
       {/* Emergency Alert Notification Banner */}
@@ -100,8 +115,76 @@ const MainLayout: React.FC = () => {
         {/* High-level Counters & Quick Filter Strip */}
         <StatsBar />
 
-        {/* View Routing */}
-        <div className="mt-2">
+        {/* View Routing & Role-Specific Dashboards */}
+        <div className="mt-4">
+          
+          {/* 1. ROLE DASHBOARDS */}
+          {activeTab === 'dashboard' && (
+            <>
+              {role === 'student' && (
+                <StudentDashboard
+                  onOpenRequestRoomModal={() => setIsStudentRoomModalOpen(true)}
+                  onOpenRequestAVModal={() => setIsRequestAVModalOpen(true)}
+                  onOpenEmergencyModal={() => handleOpenEmergencyModal()}
+                  onViewClassrooms={() => setActiveTab('overview')}
+                />
+              )}
+              {role === 'lecturer' && (
+                <LecturerDashboard
+                  onOpenSwapModal={() => setIsSwapModalOpen(true)}
+                  onOpenRequestAVModal={() => setIsRequestAVModalOpen(true)}
+                  onOpenBookingModal={() => handleOpenBookingModal()}
+                  onOpenEmergencyModal={() => handleOpenEmergencyModal()}
+                  onViewClassrooms={() => setActiveTab('overview')}
+                />
+              )}
+              {role === 'admin' && (
+                <AdminDashboard
+                  onOpenBookingModal={() => handleOpenBookingModal()}
+                  onOpenEmergencyModal={() => handleOpenEmergencyModal()}
+                />
+              )}
+            </>
+          )}
+
+          {/* 2. SPECIFIC SUB-VIEWS */}
+          {activeTab === 'student-requests' && (
+            <StudentDashboard
+              onOpenRequestRoomModal={() => setIsStudentRoomModalOpen(true)}
+              onOpenRequestAVModal={() => setIsRequestAVModalOpen(true)}
+              onOpenEmergencyModal={() => handleOpenEmergencyModal()}
+              onViewClassrooms={() => setActiveTab('overview')}
+            />
+          )}
+
+          {activeTab === 'assigned-courses' && (
+            <LecturerDashboard
+              onOpenSwapModal={() => setIsSwapModalOpen(true)}
+              onOpenRequestAVModal={() => setIsRequestAVModalOpen(true)}
+              onOpenBookingModal={() => handleOpenBookingModal()}
+              onOpenEmergencyModal={() => handleOpenEmergencyModal()}
+              onViewClassrooms={() => setActiveTab('overview')}
+            />
+          )}
+
+          {activeTab === 'classroom-swaps' && (
+            <LecturerDashboard
+              onOpenSwapModal={() => setIsSwapModalOpen(true)}
+              onOpenRequestAVModal={() => setIsRequestAVModalOpen(true)}
+              onOpenBookingModal={() => handleOpenBookingModal()}
+              onOpenEmergencyModal={() => handleOpenEmergencyModal()}
+              onViewClassrooms={() => setActiveTab('overview')}
+            />
+          )}
+
+          {activeTab === 'approvals' && (
+            <AdminDashboard
+              onOpenBookingModal={() => handleOpenBookingModal()}
+              onOpenEmergencyModal={() => handleOpenEmergencyModal()}
+            />
+          )}
+
+          {/* 3. CORE SHARED CAMPUS VIEWS */}
           {activeTab === 'overview' && (
             <ClassroomGrid
               onSelectRoom={(room) => setSelectedRoomForDetail(room)}
@@ -142,10 +225,13 @@ const MainLayout: React.FC = () => {
         </div>
       </main>
 
-      {/* Mobile Bottom Navigation (Thumb Zone) */}
+      {/* Mobile Bottom Navigation */}
       <BottomNav
         onOpenBookingModal={() => handleOpenBookingModal()}
         onOpenEmergencyModal={() => handleOpenEmergencyModal()}
+        onOpenRequestRoomModal={() => setIsStudentRoomModalOpen(true)}
+        onOpenRequestAVModal={() => setIsRequestAVModalOpen(true)}
+        onOpenSwapModal={() => setIsSwapModalOpen(true)}
       />
 
       {/* Booking Wizard Modal */}
@@ -179,14 +265,47 @@ const MainLayout: React.FC = () => {
         onCancelClass={(room) => handleOpenCancelModal(room)}
       />
 
+      {/* Student Request Room Modal */}
+      <StudentRequestRoomModal
+        isOpen={isStudentRoomModalOpen}
+        onClose={() => setIsStudentRoomModalOpen(false)}
+        onSuccess={(msg) => showToast(msg)}
+      />
+
+      {/* Request AV Equipment Modal */}
+      <RequestAVModal
+        isOpen={isRequestAVModalOpen}
+        onClose={() => setIsRequestAVModalOpen(false)}
+        onSuccess={(msg) => showToast(msg)}
+      />
+
+      {/* Lecturer Classroom Swaps Modal */}
+      <ClassroomSwapsModal
+        isOpen={isSwapModalOpen}
+        onClose={() => setIsSwapModalOpen(false)}
+        onSuccess={(msg) => showToast(msg)}
+      />
+
     </div>
   );
 };
 
+const AppContent: React.FC = () => {
+  const { isAuthenticated, user } = useAuth();
+
+  if (!isAuthenticated || !user) {
+    return <LoginPage />;
+  }
+
+  return <MainLayout />;
+};
+
 export default function App() {
   return (
-    <ClassroomProvider>
-      <MainLayout />
-    </ClassroomProvider>
+    <AuthProvider>
+      <ClassroomProvider>
+        <AppContent />
+      </ClassroomProvider>
+    </AuthProvider>
   );
 }
