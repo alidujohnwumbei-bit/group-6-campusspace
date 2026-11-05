@@ -1,0 +1,6 @@
+{
+  "name": "CampusSpace - Classroom & AV Management",
+  "description": "Cross-platform classroom management system to track room availability, occupied classes, reservations, cancellations, emergency classroom requests, and microphone & speaker audio gear readiness.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
