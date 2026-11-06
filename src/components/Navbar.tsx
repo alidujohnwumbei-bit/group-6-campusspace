@@ -178,14 +178,14 @@ export const Navbar: React.FC<NavbarProps> = ({
                   </div>
                   <div className="text-left">
                     <div className="text-xs font-bold text-slate-900 dark:text-white leading-tight flex items-center gap-1.5">
-                      <span className="truncate max-w-[130px] font-semibold">{user.name}</span>
+                      <span className="truncate max-w-[140px] font-semibold">{user.name}</span>
                       <span className="text-slate-400 font-normal">·</span>
-                      <span className={`px-1.5 py-0.2 rounded text-[9px] font-mono font-bold uppercase border ${getRoleBadgeStyle(role)}`}>
-                        {role === 'lecturer' ? 'Faculty' : role}
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase border ${getRoleBadgeStyle(role)}`}>
+                        {user.role}
                       </span>
                     </div>
                     <div className="text-[10px] text-slate-500 dark:text-slate-400 leading-tight font-mono">
-                      {role === 'student' ? `${user.studentId || 'PS/ITC/23/0042'}` : (role === 'lecturer' ? 'Senior Faculty' : 'Administrator')}
+                      {user.email}
                     </div>
                   </div>
                   <ChevronDown className="w-3.5 h-3.5 text-slate-400 ml-0.5" />
@@ -264,6 +264,8 @@ export const Navbar: React.FC<NavbarProps> = ({
                       onClick={() => {
                         logout();
                         setIsRoleDropdownOpen(false);
+                        window.history.pushState({}, '', '/login');
+                        window.dispatchEvent(new PopStateEvent('popstate'));
                       }}
                       className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 text-left font-medium"
                     >
@@ -306,7 +308,11 @@ export const Navbar: React.FC<NavbarProps> = ({
             {/* Top Right Prominent Logout Button */}
             {user && (
               <button
-                onClick={() => logout()}
+                onClick={() => {
+                  logout();
+                  window.history.pushState({}, '', '/login');
+                  window.dispatchEvent(new PopStateEvent('popstate'));
+                }}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 dark:bg-rose-950/50 dark:hover:bg-rose-900/60 dark:text-rose-300 border border-rose-200 dark:border-rose-900/50 transition-colors shadow-xs active:scale-95"
                 title="Log out of CampusSpace"
               >

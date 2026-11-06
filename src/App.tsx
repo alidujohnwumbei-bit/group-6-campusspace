@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ClassroomProvider, useClassroom } from './context/ClassroomContext';
-import { LoginPage } from './components/LoginPage';
+import { Login } from './pages/Login';
+import { Signup } from './pages/Signup';
 import { LiveWeatherTimeBar } from './components/LiveWeatherTimeBar';
 import { Navbar } from './components/Navbar';
 import { BottomNav } from './components/BottomNav';
@@ -314,11 +315,52 @@ const MainLayout: React.FC = () => {
 
 const AppContent: React.FC = () => {
   const { isAuthenticated, user } = useAuth();
+  const [currentPath, setCurrentPath] = useState<string>(() => {
+    return typeof window !== 'undefined' ? window.location.pathname || '/' : '/';
+  });
 
-  if (!isAuthenticated || !user) {
-    return <LoginPage />;
+  useEffect(() => {
+    const handlePopState = () => {
+      setCurrentPath(window.location.pathname || '/');
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  const navigate = (toPath: string) => {
+    if (window.location.pathname !== toPath) {
+      window.history.pushState({}, '', toPath);
+    }
+    setCurrentPath(toPath);
+  };
+
+  // Route: /signup (Unauthenticated or redirect if logged in)
+  if (currentPath === '/signup') {
+    if (isAuthenticated && user) {
+      navigate('/');
+    } else {
+      return <Signup onNavigate={navigate} />;
+    }
   }
 
+  // Route: /login (Unauthenticated or redirect if logged in)
+  if (currentPath === '/login') {
+    if (isAuthenticated && user) {
+      navigate('/');
+    } else {
+      return <Login onNavigate={navigate} />;
+    }
+  }
+
+  // Protected Routes: If no user, redirect to /login
+  if (!isAuthenticated || !user) {
+    if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
+      window.history.replaceState({}, '', '/login');
+    }
+    return <Login onNavigate={navigate} />;
+  }
+
+  // Authenticated Dashboard & Protected App Pages
   return <MainLayout />;
 };
 

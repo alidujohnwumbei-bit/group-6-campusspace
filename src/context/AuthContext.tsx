@@ -1,154 +1,135 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { User, UserRole } from '../types';
-import { hashPassword, verifyPassword } from '../utils/crypto';
-import { DEMO_ACCOUNTS, DemoAccount, LECTURER_PERSONAS } from '../data/mockData';
+import { LECTURER_PERSONAS } from '../data/mockData';
 
-export interface StoredUser extends User {
-  passwordHash: string;
+export type CampusRole = 'Student' | 'Lecturer' | 'Administrator';
+
+export interface CampusUserAccount {
+  name: string;
+  email: string;
+  password: string;
+  role: CampusRole;
+  id?: string;
+  department?: string;
+  studentId?: string;
+  lecturerTitle?: string;
+  assignedCourseCodes?: string[];
+  avatarUrl?: string;
 }
 
-interface AuthContextType {
+export interface AuthContextType {
   user: User | null;
   role: UserRole | null;
   isAuthenticated: boolean;
-  login: (email: string, password: string, roleOverride?: UserRole, rememberMe?: boolean) => Promise<{ success: boolean; message: string }>;
-  logout: (isSessionTimeout?: boolean) => void;
-  switchRole: (role: UserRole) => void;
+  login: (email: string, password: string, role?: CampusRole | string) => Promise<{ success: boolean; message: string }>;
+  signup: (name: string, email: string, password: string, role: CampusRole | string) => Promise<{ success: boolean; message: string }>;
+  logout: () => void;
+  // Dashboard & persona helpers
+  switchRole: (newRole: UserRole | CampusRole) => void;
   activeLecturerPersona: typeof LECTURER_PERSONAS[0];
   setActiveLecturerPersona: (persona: typeof LECTURER_PERSONAS[0]) => void;
-  demoAccounts: DemoAccount[];
   registeredUsers: User[];
   addNewUser: (userData: {
     name: string;
     email: string;
     password: string;
     role: UserRole;
-    department: string;
+    department?: string;
     studentId?: string;
     lecturerTitle?: string;
   }) => Promise<{ success: boolean; message: string }>;
   deleteUser: (userId: string) => { success: boolean; message: string };
-  rememberedEmail: string;
-  sessionTimeoutMessage: string | null;
-  clearSessionTimeoutMessage: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const AUTH_STORAGE_KEYS = {
-  USER: 'campusspace_auth_user_v3',
-  ROLE: 'campusspace_auth_role_v3',
-  USERS_REGISTRY: 'campusspace_registered_users_v3',
-  REMEMBERED_EMAIL: 'campusspace_remembered_email_v3',
-  LAST_ACTIVITY: 'campusspace_last_activity_v3',
-};
+// LocalStorage Keys
+const STORAGE_KEY_USER = 'campusUser';
+const STORAGE_KEY_USERS_LIST = 'campusUsers';
 
-// 30 Minutes Session Inactivity Timeout in milliseconds
-const SESSION_TIMEOUT_MS = 30 * 60 * 1000;
+// Default Accounts for instant testing
+const DEFAULT_ACCOUNTS: CampusUserAccount[] = [
+  {
+    name: 'System Administrator',
+    email: 'admin@campus.edu',
+    password: 'Admin123',
+    role: 'Administrator',
+    id: 'usr-admin-1',
+    department: 'DIRECTORATE OF ACADEMIC AFFAIRS',
+    lecturerTitle: 'System Administrator',
+    avatarUrl: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=80',
+  },
+  {
+    name: 'Dr. Adane',
+    email: 'lecturer@campus.edu',
+    password: 'Lecturer123',
+    role: 'Lecturer',
+    id: 'usr-lec-1',
+    department: 'MATHS AND ICT',
+    lecturerTitle: 'Dr. Adane (Faculty)',
+    assignedCourseCodes: ['EIT311', 'EIT302', 'INF309'],
+    avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
+  },
+  {
+    name: 'Kwame Mensah',
+    email: 'student@campus.edu',
+    password: 'Student123',
+    role: 'Student',
+    id: 'usr-student-1',
+    department: 'MATHS AND ICT',
+    studentId: 'PS/ITC/23/0042',
+    avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
+  },
+];
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // Session timeout banner state
-  const [sessionTimeoutMessage, setSessionTimeoutMessage] = useState<string | null>(null);
-
-  // Initialize Registered Users with encrypted default accounts
-  const [registeredUsers, setRegisteredUsers] = useState<StoredUser[]>([]);
-
-  // Initialize Default Accounts in localStorage on boot
-  useEffect(() => {
-    const initDefaultUsers = async () => {
-      const saved = localStorage.getItem(AUTH_STORAGE_KEYS.USERS_REGISTRY);
+  // 1. Initialize Users in localStorage key 'campusUsers'
+  const [campusUsers, setCampusUsers] = useState<CampusUserAccount[]>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY_USERS_LIST);
       if (saved) {
-        try {
-          const parsed = JSON.parse(saved);
-          if (Array.isArray(parsed) && parsed.length >= 3) {
-            setRegisteredUsers(parsed);
-            return;
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          // Ensure default admin exists
+          const hasAdmin = parsed.some((u) => u.email?.toLowerCase() === 'admin@campus.edu');
+          if (!hasAdmin) {
+            const merged = [...parsed, DEFAULT_ACCOUNTS[0]];
+            localStorage.setItem(STORAGE_KEY_USERS_LIST, JSON.stringify(merged));
+            return merged;
           }
-        } catch (e) {
-          console.error(e);
+          return parsed;
         }
       }
+    } catch (e) {
+      console.error('Error reading campusUsers:', e);
+    }
 
-      // Generate encrypted defaults
-      const adminHash = await hashPassword('Admin123');
-      const lecturerHash = await hashPassword('Lecturer123');
-      const studentHash = await hashPassword('Student123');
-
-      const initialUsers: StoredUser[] = [
-        {
-          id: 'usr-admin-1',
-          email: 'admin@campus.edu',
-          name: 'Academic Affairs Admin',
-          role: 'admin',
-          department: 'DIRECTORATE OF ACADEMIC AFFAIRS',
-          lecturerTitle: 'System Administrator',
-          avatarUrl: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=80',
-          passwordHash: adminHash,
-        },
-        {
-          id: 'usr-lec-1',
-          email: 'lecturer@campus.edu',
-          name: 'Dr. Adane',
-          role: 'lecturer',
-          department: 'MATHS AND ICT',
-          lecturerTitle: 'Dr. Adane (Faculty)',
-          assignedCourseCodes: ['EIT311', 'EIT302', 'INF309'],
-          avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
-          passwordHash: lecturerHash,
-        },
-        {
-          id: 'usr-student-1',
-          email: 'student@campus.edu',
-          name: 'Kwame Mensah',
-          role: 'student',
-          department: 'MATHS AND ICT',
-          studentId: 'STU-2026-042',
-          avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
-          passwordHash: studentHash,
-        },
-      ];
-
-      setRegisteredUsers(initialUsers);
-      localStorage.setItem(AUTH_STORAGE_KEYS.USERS_REGISTRY, JSON.stringify(initialUsers));
-    };
-
-    initDefaultUsers();
-  }, []);
-
-  // Remembered email for quick convenience
-  const [rememberedEmail] = useState<string>(() => {
-    return localStorage.getItem(AUTH_STORAGE_KEYS.REMEMBERED_EMAIL) || 'admin@campus.edu';
+    // Default Seed on First Load
+    localStorage.setItem(STORAGE_KEY_USERS_LIST, JSON.stringify(DEFAULT_ACCOUNTS));
+    return DEFAULT_ACCOUNTS;
   });
 
-  // Current Logged-in User
+  // 2. Manage User State from key 'campusUser'
   const [user, setUser] = useState<User | null>(() => {
-    const saved = localStorage.getItem(AUTH_STORAGE_KEYS.USER);
-    if (saved) {
-      try {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY_USER);
+      if (saved) {
         return JSON.parse(saved);
-      } catch (e) {
-        console.error('Failed to parse saved user:', e);
       }
+    } catch (e) {
+      console.error('Error reading campusUser:', e);
     }
-    return null; // Require login if no valid session
+    return null;
   });
 
-  const [role, setRole] = useState<UserRole | null>(() => {
-    const savedRole = localStorage.getItem(AUTH_STORAGE_KEYS.ROLE);
-    if (savedRole === 'student' || savedRole === 'lecturer' || savedRole === 'admin') {
-      return savedRole;
-    }
-    return user ? user.role : null;
-  });
-
-  // Lecturer persona selector
+  // Keep active lecturer persona in sync
   const [activeLecturerPersona, setActiveLecturerPersonaState] = useState(() => {
-    return LECTURER_PERSONAS[0]; // Dr Adane default
+    return LECTURER_PERSONAS[0];
   });
 
   const setActiveLecturerPersona = (persona: typeof LECTURER_PERSONAS[0]) => {
     setActiveLecturerPersonaState(persona);
-    if (user && user.role === 'lecturer') {
+    if (user && (user.role === 'Lecturer' || user.role === 'lecturer')) {
       const updatedUser: User = {
         ...user,
         name: persona.name,
@@ -157,233 +138,196 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         lecturerTitle: `${persona.name} (Faculty)`,
       };
       setUser(updatedUser);
-      localStorage.setItem(AUTH_STORAGE_KEYS.USER, JSON.stringify(updatedUser));
+      localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(updatedUser));
     }
   };
 
-  // Logout Function
-  const logout = useCallback((isSessionTimeout = false) => {
-    setUser(null);
-    setRole(null);
-    localStorage.removeItem(AUTH_STORAGE_KEYS.USER);
-    localStorage.removeItem(AUTH_STORAGE_KEYS.ROLE);
-    localStorage.removeItem(AUTH_STORAGE_KEYS.LAST_ACTIVITY);
-    if (isSessionTimeout) {
-      setSessionTimeoutMessage('Your session has timed out after 30 minutes of inactivity. Please log in again.');
-    }
-  }, []);
+  // Helper to normalize role
+  const normalizeRole = (r?: string | null): CampusRole => {
+    if (!r) return 'Student';
+    const low = r.toLowerCase();
+    if (low.includes('admin')) return 'Administrator';
+    if (low.includes('lec') || low.includes('fac')) return 'Lecturer';
+    return 'Student';
+  };
 
-  // Session Activity Tracker (30 Minutes Timeout)
-  useEffect(() => {
-    if (!user) return;
-
-    const updateActivity = () => {
-      localStorage.setItem(AUTH_STORAGE_KEYS.LAST_ACTIVITY, Date.now().toString());
-    };
-
-    // Initial stamp
-    updateActivity();
-
-    const activityEvents = ['mousedown', 'keydown', 'scroll', 'touchstart'];
-    let throttleTimeout: NodeJS.Timeout | null = null;
-
-    const handleUserActivity = () => {
-      if (!throttleTimeout) {
-        updateActivity();
-        throttleTimeout = setTimeout(() => {
-          throttleTimeout = null;
-        }, 10000); // Throttle activity updates to every 10 seconds
-      }
-    };
-
-    activityEvents.forEach((event) => {
-      window.addEventListener(event, handleUserActivity);
-    });
-
-    // Check interval every 20 seconds for 30 minutes timeout
-    const interval = setInterval(() => {
-      const last = localStorage.getItem(AUTH_STORAGE_KEYS.LAST_ACTIVITY);
-      if (last) {
-        const lastTime = parseInt(last, 10);
-        if (Date.now() - lastTime > SESSION_TIMEOUT_MS) {
-          logout(true);
-        }
-      }
-    }, 20000);
-
-    return () => {
-      activityEvents.forEach((event) => {
-        window.removeEventListener(event, handleUserActivity);
-      });
-      clearInterval(interval);
-      if (throttleTimeout) clearTimeout(throttleTimeout);
-    };
-  }, [user, logout]);
-
-  // Login Function with password hash verification
+  // 3. Login function
   const login = async (
-    email: string, 
-    password: string, 
-    roleOverride?: UserRole, 
-    rememberMe = true
+    email: string,
+    password: string,
+    requestedRole?: CampusRole | string
   ): Promise<{ success: boolean; message: string }> => {
     const trimmedEmail = email.trim().toLowerCase();
 
-    // Security validation: Password must be 6+ characters
-    if (!password || password.length < 6) {
-      return { success: false, message: 'Password must be at least 6 characters in length.' };
+    if (!trimmedEmail) {
+      return { success: false, message: 'Please enter your email address.' };
+    }
+    if (!password) {
+      return { success: false, message: 'Please enter your password.' };
     }
 
-    // Load fresh registry from storage
-    let currentRegistry: StoredUser[] = registeredUsers;
-    const saved = localStorage.getItem(AUTH_STORAGE_KEYS.USERS_REGISTRY);
-    if (saved) {
-      try {
-        currentRegistry = JSON.parse(saved);
-      } catch (e) {
-        console.error(e);
+    // Read fresh users list from localStorage
+    let currentUsers: CampusUserAccount[] = campusUsers;
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY_USERS_LIST);
+      if (saved) {
+        currentUsers = JSON.parse(saved);
       }
+    } catch (e) {
+      console.error(e);
     }
 
     // Find account by email (or fallback aliases)
-    let foundUser = currentRegistry.find((u) => u.email.toLowerCase() === trimmedEmail);
-
-    // Fallback checks for alias UCC addresses
-    if (!foundUser) {
+    let found = currentUsers.find((u) => u.email.toLowerCase() === trimmedEmail);
+    if (!found) {
       if (trimmedEmail === 'admin@ucc.edu.gh') {
-        foundUser = currentRegistry.find((u) => u.email === 'admin@campus.edu');
+        found = currentUsers.find((u) => u.email.toLowerCase() === 'admin@campus.edu');
       } else if (trimmedEmail === 'lecturer@ucc.edu.gh') {
-        foundUser = currentRegistry.find((u) => u.email === 'lecturer@campus.edu');
+        found = currentUsers.find((u) => u.email.toLowerCase() === 'lecturer@campus.edu');
       } else if (trimmedEmail === 'student@ucc.edu.gh') {
-        foundUser = currentRegistry.find((u) => u.email === 'student@campus.edu');
+        found = currentUsers.find((u) => u.email.toLowerCase() === 'student@campus.edu');
       }
     }
 
-    if (!foundUser) {
+    if (!found) {
       return { success: false, message: 'No registered user found with this email address.' };
     }
 
-    // Verify Password against stored encrypted hash
-    const isValid = await verifyPassword(password, foundUser.passwordHash);
-    
-    // Also accept plaintext fallback for demo evaluation if hash was somehow mismatched
-    const demoFallback = DEMO_ACCOUNTS.find(
-      (d) => d.email.toLowerCase() === trimmedEmail && d.password === password
-    );
-
-    if (!isValid && !demoFallback) {
-      return { success: false, message: 'Incorrect password. Please verify your credentials and try again.' };
+    // Verify Password
+    if (found.password !== password) {
+      return { success: false, message: 'Incorrect password. Please verify your credentials.' };
     }
 
-    // Target role check
-    const effectiveRole: UserRole = foundUser.role;
-
-    // Save remember me email
-    if (rememberMe) {
-      localStorage.setItem(AUTH_STORAGE_KEYS.REMEMBERED_EMAIL, foundUser.email);
-    } else {
-      localStorage.removeItem(AUTH_STORAGE_KEYS.REMEMBERED_EMAIL);
+    // If role requested, verify matching
+    if (requestedRole) {
+      const normRequested = normalizeRole(requestedRole);
+      const normFound = normalizeRole(found.role);
+      if (normRequested !== normFound) {
+        return {
+          success: false,
+          message: `Account is registered as ${normFound}, but ${normRequested} was selected.`,
+        };
+      }
     }
 
     const sessionUser: User = {
-      id: foundUser.id,
-      email: foundUser.email,
-      name: foundUser.name,
-      role: effectiveRole,
-      department: foundUser.department,
-      studentId: foundUser.studentId,
-      lecturerTitle: foundUser.lecturerTitle,
-      assignedCourseCodes: foundUser.assignedCourseCodes,
-      avatarUrl: foundUser.avatarUrl,
+      id: found.id || `usr-${Date.now()}`,
+      name: found.name,
+      email: found.email,
+      role: normalizeRole(found.role),
+      department: found.department || (normalizeRole(found.role) === 'Administrator' ? 'Directorate of Academic Affairs' : 'Maths and ICT'),
+      studentId: found.studentId || (normalizeRole(found.role) === 'Student' ? 'PS/ITC/23/0042' : undefined),
+      lecturerTitle: found.lecturerTitle || (normalizeRole(found.role) === 'Lecturer' ? `${found.name} (Faculty)` : undefined),
+      assignedCourseCodes: found.assignedCourseCodes,
+      avatarUrl: found.avatarUrl,
     };
 
+    // Save to localStorage key 'campusUser'
+    localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(sessionUser));
     setUser(sessionUser);
-    setRole(effectiveRole);
-    localStorage.setItem(AUTH_STORAGE_KEYS.USER, JSON.stringify(sessionUser));
-    localStorage.setItem(AUTH_STORAGE_KEYS.ROLE, effectiveRole);
-    localStorage.setItem(AUTH_STORAGE_KEYS.LAST_ACTIVITY, Date.now().toString());
-    setSessionTimeoutMessage(null);
 
-    return { 
-      success: true, 
-      message: `Login successful. Welcome back, ${sessionUser.name} (${effectiveRole.toUpperCase()})!` 
+    return {
+      success: true,
+      message: `Welcome back, ${sessionUser.name}!`,
     };
   };
 
-  // Add New User (Admin Role Feature)
-  const addNewUser = async (userData: {
-    name: string;
-    email: string;
-    password: string;
-    role: UserRole;
-    department: string;
-    studentId?: string;
-    lecturerTitle?: string;
-  }): Promise<{ success: boolean; message: string }> => {
-    if (role !== 'admin') {
-      return { success: false, message: 'Unauthorized: Only Administrators can create new user accounts.' };
+  // 4. Signup function
+  const signup = async (
+    name: string,
+    email: string,
+    password: string,
+    roleInput: CampusRole | string
+  ): Promise<{ success: boolean; message: string }> => {
+    const trimmedName = name.trim();
+    const trimmedEmail = email.trim().toLowerCase();
+
+    if (!trimmedName) {
+      return { success: false, message: 'Full name is required.' };
+    }
+    if (!trimmedEmail || !trimmedEmail.includes('@')) {
+      return { success: false, message: 'Valid email address is required.' };
+    }
+    if (!password || password.length < 6) {
+      return { success: false, message: 'Password must be at least 6 characters long.' };
     }
 
-    const trimmedEmail = userData.email.trim().toLowerCase();
-    if (!userData.password || userData.password.length < 6) {
-      return { success: false, message: 'User password must be at least 6 characters.' };
+    let currentUsers: CampusUserAccount[] = campusUsers;
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY_USERS_LIST);
+      if (saved) {
+        currentUsers = JSON.parse(saved);
+      }
+    } catch (e) {
+      console.error(e);
     }
 
-    const exists = registeredUsers.some((u) => u.email.toLowerCase() === trimmedEmail);
+    // Check if email already exists
+    const exists = currentUsers.some((u) => u.email.toLowerCase() === trimmedEmail);
     if (exists) {
-      return { success: false, message: 'An account with this email address already exists.' };
+      return { success: false, message: 'An account with this email address already exists. Please log in.' };
     }
 
-    const passwordHash = await hashPassword(userData.password);
-    const newUser: StoredUser = {
-      id: `usr-${userData.role}-${Date.now()}`,
+    const assignedRole = normalizeRole(roleInput);
+
+    const newAccount: CampusUserAccount = {
+      id: `usr-${Date.now()}`,
+      name: trimmedName,
       email: trimmedEmail,
-      name: userData.name,
-      role: userData.role,
-      department: userData.department,
-      studentId: userData.studentId,
-      lecturerTitle: userData.lecturerTitle || (userData.role === 'lecturer' ? `${userData.name} (Faculty)` : undefined),
-      passwordHash,
-      avatarUrl: userData.role === 'student' 
-        ? 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80'
-        : (userData.role === 'lecturer' 
+      password: password,
+      role: assignedRole,
+      department: assignedRole === 'Administrator' ? 'Directorate of Academic Affairs' : 'Maths and ICT',
+      studentId: assignedRole === 'Student' ? `STU-${Math.floor(1000 + Math.random() * 9000)}` : undefined,
+      lecturerTitle: assignedRole === 'Lecturer' ? `${trimmedName} (Faculty)` : undefined,
+      avatarUrl:
+        assignedRole === 'Student'
+          ? 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80'
+          : assignedRole === 'Lecturer'
           ? 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80'
-          : 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=80'),
+          : 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=80',
     };
 
-    const updated = [newUser, ...registeredUsers];
-    setRegisteredUsers(updated);
-    localStorage.setItem(AUTH_STORAGE_KEYS.USERS_REGISTRY, JSON.stringify(updated));
+    const updatedUsers = [...currentUsers, newAccount];
+    setCampusUsers(updatedUsers);
+    localStorage.setItem(STORAGE_KEY_USERS_LIST, JSON.stringify(updatedUsers));
 
-    return { success: true, message: `User "${userData.name}" (${userData.role}) created successfully!` };
+    // Save session in localStorage key 'campusUser'
+    const sessionUser: User = {
+      id: newAccount.id,
+      name: newAccount.name,
+      email: newAccount.email,
+      role: assignedRole,
+      department: newAccount.department,
+      studentId: newAccount.studentId,
+      lecturerTitle: newAccount.lecturerTitle,
+      avatarUrl: newAccount.avatarUrl,
+    };
+
+    localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(sessionUser));
+    setUser(sessionUser);
+
+    return {
+      success: true,
+      message: 'Account created successfully!',
+    };
   };
 
-  // Delete User (Admin Role Feature)
-  const deleteUser = (userId: string) => {
-    if (role !== 'admin') {
-      return { success: false, message: 'Unauthorized: Only Administrators can delete accounts.' };
-    }
+  // 5. Logout function
+  const logout = useCallback(() => {
+    setUser(null);
+    localStorage.removeItem(STORAGE_KEY_USER);
+  }, []);
 
-    // Prevent deleting the primary admin account
-    const target = registeredUsers.find((u) => u.id === userId);
-    if (target?.email === 'admin@campus.edu') {
-      return { success: false, message: 'The primary system administrator account cannot be deleted.' };
-    }
+  // Quick switch role for testing
+  const switchRole = (newRole: UserRole | CampusRole) => {
+    const target = normalizeRole(newRole);
+    const demo = DEFAULT_ACCOUNTS.find((d) => d.role === target) || DEFAULT_ACCOUNTS[0];
 
-    const updated = registeredUsers.filter((u) => u.id !== userId);
-    setRegisteredUsers(updated);
-    localStorage.setItem(AUTH_STORAGE_KEYS.USERS_REGISTRY, JSON.stringify(updated));
-    return { success: true, message: 'User account removed from database.' };
-  };
-
-  // Role Switcher for instant testing
-  const switchRole = (newRole: UserRole) => {
-    const demo = DEMO_ACCOUNTS.find((d) => d.role === newRole) || DEMO_ACCOUNTS[0];
-    const newUser: User = {
-      id: `usr-${newRole}-${Date.now()}`,
+    const sessionUser: User = {
+      id: demo.id,
       email: demo.email,
       name: demo.name,
-      role: newRole,
+      role: target,
       department: demo.department,
       studentId: demo.studentId,
       lecturerTitle: demo.lecturerTitle,
@@ -391,31 +335,66 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       avatarUrl: demo.avatarUrl,
     };
 
-    setUser(newUser);
-    setRole(newRole);
-    localStorage.setItem(AUTH_STORAGE_KEYS.USER, JSON.stringify(newUser));
-    localStorage.setItem(AUTH_STORAGE_KEYS.ROLE, newRole);
-    localStorage.setItem(AUTH_STORAGE_KEYS.LAST_ACTIVITY, Date.now().toString());
+    setUser(sessionUser);
+    localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(sessionUser));
   };
+
+  // Add New User (Admin console)
+  const addNewUser = async (userData: {
+    name: string;
+    email: string;
+    password: string;
+    role: UserRole;
+    department?: string;
+    studentId?: string;
+    lecturerTitle?: string;
+  }): Promise<{ success: boolean; message: string }> => {
+    return signup(userData.name, userData.email, userData.password, userData.role);
+  };
+
+  // Delete User (Admin console)
+  const deleteUser = (userId: string) => {
+    const target = campusUsers.find((u) => u.id === userId);
+    if (target?.email === 'admin@campus.edu') {
+      return { success: false, message: 'The primary system administrator cannot be deleted.' };
+    }
+
+    const updated = campusUsers.filter((u) => u.id !== userId);
+    setCampusUsers(updated);
+    localStorage.setItem(STORAGE_KEY_USERS_LIST, JSON.stringify(updated));
+    return { success: true, message: 'User removed successfully.' };
+  };
+
+  const registeredUsers: User[] = campusUsers.map((u) => ({
+    id: u.id || u.email,
+    name: u.name,
+    email: u.email,
+    role: normalizeRole(u.role),
+    department: u.department,
+    studentId: u.studentId,
+    lecturerTitle: u.lecturerTitle,
+    avatarUrl: u.avatarUrl,
+  }));
+
+  const effectiveRole: UserRole | null = user
+    ? (user.role.toLowerCase() as UserRole)
+    : null;
 
   return (
     <AuthContext.Provider
       value={{
         user,
-        role,
-        isAuthenticated: !!user && !!role,
+        role: effectiveRole,
+        isAuthenticated: !!user,
         login,
+        signup,
         logout,
         switchRole,
         activeLecturerPersona,
         setActiveLecturerPersona,
-        demoAccounts: DEMO_ACCOUNTS,
         registeredUsers,
         addNewUser,
         deleteUser,
-        rememberedEmail,
-        sessionTimeoutMessage,
-        clearSessionTimeoutMessage: () => setSessionTimeoutMessage(null),
       }}
     >
       {children}

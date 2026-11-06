@@ -163,14 +163,14 @@ export interface EmergencyRequest {
 // AUTHENTICATION & MULTI-ROLE SYSTEM TYPES
 // ==========================================
 
-export type UserRole = 'student' | 'lecturer' | 'admin';
+export type UserRole = 'Student' | 'Lecturer' | 'Administrator' | 'student' | 'lecturer' | 'admin';
 
 export interface User {
-  id: string;
+  id?: string;
   email: string;
   name: string;
   role: UserRole;
-  department: string;
+  department?: string;
   studentId?: string; // e.g. "PS/ITC/23/0042"
   lecturerTitle?: string; // e.g. "Dr. Adane", "Dr. Nelly"
   assignedCourseCodes?: string[];

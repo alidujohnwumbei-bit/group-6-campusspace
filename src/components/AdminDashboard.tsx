@@ -557,7 +557,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     <td className="px-4 py-3 text-right">
                       {u.email !== 'admin@campus.edu' ? (
                         <button
-                          onClick={() => handleDeleteUserAccount(u.id)}
+                          onClick={() => handleDeleteUserAccount(u.id || '')}
                           className="p-1 rounded text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40"
                           title="Remove user account"
                         >
