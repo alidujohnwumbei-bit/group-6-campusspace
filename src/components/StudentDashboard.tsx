@@ -50,8 +50,8 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
   const approvedRoomCount = myRoomRequests.filter(r => r.status === 'approved').length;
   const pendingAVCount = myAVRequests.filter(r => r.status === 'pending').length;
 
-  // Available quiet study rooms
-  const availableStudyRooms = classrooms.filter(r => r.status === 'available').slice(0, 6);
+  // Available quiet study rooms (9/21 Available Rooms in NLT Block)
+  const availableStudyRooms = classrooms.filter(r => r.status === 'available');
 
   return (
     <div className="space-y-6">
@@ -62,7 +62,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
           <div className="space-y-1.5">
             <div className="inline-flex items-center gap-2 px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-xs font-mono">
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-              <span>STUDENT PORTAL ACTIVE</span>
+              <span>STUDENT PORTAL · 9/21 ROOMS FREE NOW</span>
             </div>
             <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight">
               Welcome, {user?.name || 'Kwame Mensah'}
@@ -78,7 +78,14 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
               className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-xl bg-indigo-500 hover:bg-indigo-400 text-white shadow-sm transition-all active:scale-95"
             >
               <CalendarPlus className="w-4 h-4" />
-              <span>Request Classroom</span>
+              <span>Book Classroom</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('timetable')}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-xl bg-white/10 hover:bg-white/20 text-white border border-white/20 transition-all active:scale-95"
+            >
+              <Clock className="w-4 h-4 text-emerald-400" />
+              <span>View Timetable</span>
             </button>
             <button
               onClick={onOpenRequestAVModal}
@@ -88,11 +95,11 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
               <span>Request AV Gear</span>
             </button>
             <button
-              onClick={onOpenEmergencyModal}
+              onClick={() => setActiveTab('emergency')}
               className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-xl bg-rose-600/90 hover:bg-rose-600 text-white transition-all active:scale-95"
             >
               <AlertTriangle className="w-4 h-4" />
-              <span>Emergency</span>
+              <span>Emergency Dispatch</span>
             </button>
           </div>
         </div>
@@ -100,36 +107,59 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
 
       {/* 2. Key Metrics Bar */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 rounded-xl shadow-xs">
-          <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">Approved Allocations</div>
+        <div 
+          onClick={onViewClassrooms}
+          className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 rounded-xl shadow-xs cursor-pointer hover:border-emerald-400 transition-all"
+        >
+          <div className="flex items-center justify-between">
+            <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">Available Rooms</div>
+            <span className="text-[10px] font-mono font-bold bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400 px-1.5 py-0.5 rounded">
+              9/21 Live
+            </span>
+          </div>
           <div className="text-2xl font-bold font-mono text-emerald-600 dark:text-emerald-400 mt-1">
-            {approvedRoomCount}
+            {availableStudyRooms.length} / 21
           </div>
-          <div className="text-[11px] text-slate-400 mt-0.5">Ready for group study / presentation</div>
+          <div className="text-[11px] text-slate-400 mt-0.5">Click to explore open lecture theaters</div>
         </div>
 
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 rounded-xl shadow-xs">
-          <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">Pending Approvals</div>
-          <div className="text-2xl font-bold font-mono text-amber-500 mt-1">
-            {pendingRoomCount}
+        <div 
+          onClick={() => setActiveTab('timetable')}
+          className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 rounded-xl shadow-xs cursor-pointer hover:border-indigo-400 transition-all"
+        >
+          <div className="flex items-center justify-between">
+            <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">Timetable Matrix</div>
+            <Clock className="w-3.5 h-3.5 text-indigo-500" />
           </div>
-          <div className="text-[11px] text-slate-400 mt-0.5">Under review by Timetable admin</div>
-        </div>
-
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 rounded-xl shadow-xs">
-          <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">AV Requisitions</div>
-          <div className="text-2xl font-bold font-mono text-sky-500 mt-1">
-            {myAVRequests.length}
-          </div>
-          <div className="text-[11px] text-slate-400 mt-0.5">{pendingAVCount} currently awaiting dispatch</div>
-        </div>
-
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 rounded-xl shadow-xs">
-          <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">Free Study Halls Now</div>
           <div className="text-2xl font-bold font-mono text-indigo-600 dark:text-indigo-400 mt-1">
-            {availableStudyRooms.length}
+            21 Rooms
           </div>
-          <div className="text-[11px] text-slate-400 mt-0.5">Available across NLT1 to NLT21</div>
+          <div className="text-[11px] text-slate-400 mt-0.5">Mon - Fri schedule across NLT1 to NLT21</div>
+        </div>
+
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 rounded-xl shadow-xs">
+          <div className="flex items-center justify-between">
+            <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">My Bookings Status</div>
+            <span className="text-[10px] font-mono text-amber-500">{pendingRoomCount} pending</span>
+          </div>
+          <div className="text-2xl font-bold font-mono text-slate-900 dark:text-white mt-1">
+            {approvedRoomCount} <span className="text-xs font-normal text-slate-400">Approved</span>
+          </div>
+          <div className="text-[11px] text-slate-400 mt-0.5">{myRoomRequests.length} total room requests submitted</div>
+        </div>
+
+        <div 
+          onClick={() => setActiveTab('emergency')}
+          className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 rounded-xl shadow-xs cursor-pointer hover:border-rose-400 transition-all"
+        >
+          <div className="flex items-center justify-between">
+            <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">Emergency Monitor</div>
+            <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse"></span>
+          </div>
+          <div className="text-2xl font-bold font-mono text-rose-600 dark:text-rose-400 mt-1">
+            View Only
+          </div>
+          <div className="text-[11px] text-slate-400 mt-0.5">Real-time room reallocation radar</div>
         </div>
       </div>
 
@@ -335,50 +365,82 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
         </div>
       </div>
 
-      {/* 4. Currently Available Study Theaters in NLT Block */}
+      {/* 4. Currently Available Rooms (9/21 in NLT Block) */}
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-xs transition-colors">
-        <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-200 dark:border-slate-800">
           <div>
-            <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+            <div className="inline-flex items-center gap-2 px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300 text-[11px] font-mono font-bold mb-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+              <span>Available Rooms ({availableStudyRooms.length}/21)</span>
+            </div>
+            <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
               <Building2 className="w-4 h-4 text-emerald-500" />
-              <span>Available NLT Lecture Halls (Quiet Study / Open Access)</span>
+              <span>Free Classrooms Ready for Study or Booking</span>
             </h3>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-              These rooms are currently unallocated and open for students
+              Instant access lecture halls in the NLT complex with verified audio/visual gear
             </p>
           </div>
           <button
             onClick={onViewClassrooms}
-            className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 flex items-center gap-1"
+            className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 flex items-center gap-1 self-start sm:self-auto"
           >
-            <span>View All 21 Rooms</span>
+            <span>View All Classrooms Grid</span>
             <ChevronRight className="w-3.5 h-3.5" />
           </button>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mt-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5 mt-4">
           {availableStudyRooms.map((room) => (
-            <button
+            <div
               key={room.id}
-              onClick={() => {
-                setSelectedRoom(room);
-                onViewClassrooms();
-              }}
-              className="p-3 rounded-xl border border-emerald-200 dark:border-emerald-800/60 bg-emerald-50/40 dark:bg-emerald-950/20 text-left hover:border-emerald-400 transition-all hover:scale-[1.02] group"
+              className="p-4 rounded-xl border border-emerald-200 dark:border-emerald-800/60 bg-emerald-50/30 dark:bg-emerald-950/20 text-left hover:border-emerald-400 transition-all flex flex-col justify-between"
             >
-              <div className="flex items-center justify-between">
-                <span className="font-mono font-bold text-sm text-slate-900 dark:text-white">
-                  {room.code}
-                </span>
-                <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono font-extrabold text-base text-slate-900 dark:text-white">
+                      {room.code}
+                    </span>
+                    <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-800">
+                      Level {room.floor}
+                    </span>
+                  </div>
+                  <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 dark:text-emerald-400">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                    Available
+                  </span>
+                </div>
+
+                <div className="text-xs font-medium text-slate-700 dark:text-slate-300">
+                  {room.name}
+                </div>
+
+                <div className="flex items-center gap-3 text-[11px] text-slate-500 dark:text-slate-400 mt-2 font-mono">
+                  <span>👥 {room.capacity} seats</span>
+                  <span>❄️ {room.airConditioning !== 'off' ? 'Air-conditioned' : 'Ventilated'}</span>
+                  <span>📽️ {room.projectorDisplay !== 'none' ? 'Projector' : 'Whiteboard'}</span>
+                </div>
               </div>
-              <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 capitalize truncate">
-                {room.type.replace('-', ' ')}
+
+              <div className="mt-4 pt-3 border-t border-emerald-200/60 dark:border-emerald-900/40 flex items-center gap-2">
+                <button
+                  onClick={onOpenRequestRoomModal}
+                  className="flex-1 py-1.5 px-3 text-xs font-bold rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white transition-all shadow-xs text-center"
+                >
+                  Book Classroom
+                </button>
+                <button
+                  onClick={() => {
+                    setSelectedRoom(room);
+                    onViewClassrooms();
+                  }}
+                  className="py-1.5 px-3 text-xs font-medium rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 text-center"
+                >
+                  Details
+                </button>
               </div>
-              <div className="text-[10px] font-mono text-emerald-700 dark:text-emerald-400 font-semibold mt-1">
-                {room.capacity} seats · Free Now
-              </div>
-            </button>
+            </div>
           ))}
         </div>
       </div>

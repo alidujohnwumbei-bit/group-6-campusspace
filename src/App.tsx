@@ -23,6 +23,7 @@ import { CancelClassModal } from './components/CancelClassModal';
 import { StudentRequestRoomModal } from './components/StudentRequestRoomModal';
 import { RequestAVModal } from './components/RequestAVModal';
 import { ClassroomSwapsModal } from './components/ClassroomSwapsModal';
+import { ReportIssueModal } from './components/ReportIssueModal';
 import { Classroom } from './types';
 import { CheckCircle2, X } from 'lucide-react';
 
@@ -37,6 +38,8 @@ const MainLayout: React.FC = () => {
   const [isStudentRoomModalOpen, setIsStudentRoomModalOpen] = useState(false);
   const [isRequestAVModalOpen, setIsRequestAVModalOpen] = useState(false);
   const [isSwapModalOpen, setIsSwapModalOpen] = useState(false);
+  const [isReportIssueModalOpen, setIsReportIssueModalOpen] = useState(false);
+  const [reportIssueRoomCode, setReportIssueRoomCode] = useState('NLT2');
 
   const [selectedRoomForBooking, setSelectedRoomForBooking] = useState<Classroom | null>(null);
   const [selectedRoomForEmergency, setSelectedRoomForEmergency] = useState<Classroom | null>(null);
@@ -135,6 +138,10 @@ const MainLayout: React.FC = () => {
                   onOpenRequestAVModal={() => setIsRequestAVModalOpen(true)}
                   onOpenBookingModal={() => handleOpenBookingModal()}
                   onOpenEmergencyModal={() => handleOpenEmergencyModal()}
+                  onOpenReportIssueModal={(roomCode?: string) => {
+                    if (roomCode) setReportIssueRoomCode(roomCode);
+                    setIsReportIssueModalOpen(true);
+                  }}
                   onViewClassrooms={() => setActiveTab('overview')}
                 />
               )}
@@ -163,6 +170,10 @@ const MainLayout: React.FC = () => {
               onOpenRequestAVModal={() => setIsRequestAVModalOpen(true)}
               onOpenBookingModal={() => handleOpenBookingModal()}
               onOpenEmergencyModal={() => handleOpenEmergencyModal()}
+              onOpenReportIssueModal={(roomCode?: string) => {
+                if (roomCode) setReportIssueRoomCode(roomCode);
+                setIsReportIssueModalOpen(true);
+              }}
               onViewClassrooms={() => setActiveTab('overview')}
             />
           )}
@@ -173,6 +184,10 @@ const MainLayout: React.FC = () => {
               onOpenRequestAVModal={() => setIsRequestAVModalOpen(true)}
               onOpenBookingModal={() => handleOpenBookingModal()}
               onOpenEmergencyModal={() => handleOpenEmergencyModal()}
+              onOpenReportIssueModal={(roomCode?: string) => {
+                if (roomCode) setReportIssueRoomCode(roomCode);
+                setIsReportIssueModalOpen(true);
+              }}
               onViewClassrooms={() => setActiveTab('overview')}
             />
           )}
@@ -284,6 +299,13 @@ const MainLayout: React.FC = () => {
         isOpen={isSwapModalOpen}
         onClose={() => setIsSwapModalOpen(false)}
         onSuccess={(msg) => showToast(msg)}
+      />
+
+      {/* Faculty Report Equipment / Projector Issue Modal */}
+      <ReportIssueModal
+        isOpen={isReportIssueModalOpen}
+        onClose={() => setIsReportIssueModalOpen(false)}
+        defaultRoomCode={reportIssueRoomCode}
       />
 
     </div>

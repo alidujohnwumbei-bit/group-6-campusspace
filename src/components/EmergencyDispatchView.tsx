@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useClassroom } from '../context/ClassroomContext';
+import { useAuth } from '../context/AuthContext';
 import { EmergencyRequest } from '../types';
 import { 
   ShieldAlert, 
@@ -19,6 +20,7 @@ export const EmergencyDispatchView: React.FC<{ onOpenEmergencyModal: () => void 
   onOpenEmergencyModal,
 }) => {
   const { emergencyRequests, resolveEmergencyRequest, classrooms } = useClassroom();
+  const { role } = useAuth();
   const [statusFilter, setStatusFilter] = useState('All');
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -45,10 +47,17 @@ export const EmergencyDispatchView: React.FC<{ onOpenEmergencyModal: () => void 
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200 dark:border-slate-800">
         <div>
-          <h2 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white flex items-center gap-2">
-            <ShieldAlert className="w-5 h-5 text-rose-600" />
-            <span>Emergency Classroom &amp; AV Dispatch Center</span>
-          </h2>
+          <div className="flex items-center gap-2">
+            <h2 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white flex items-center gap-2">
+              <ShieldAlert className="w-5 h-5 text-rose-600" />
+              <span>Emergency Classroom &amp; AV Dispatch Center</span>
+            </h2>
+            {role === 'student' && (
+              <span className="px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-[10px] font-mono border border-slate-300 dark:border-slate-700">
+                Student View: Read-Only
+              </span>
+            )}
+          </div>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
             Rapid response hub for urgent equipment failures, classroom swaps, and priority room reassignments.
           </p>
@@ -174,13 +183,19 @@ export const EmergencyDispatchView: React.FC<{ onOpenEmergencyModal: () => void 
                 {/* Actions */}
                 <div className="flex items-center gap-2 self-end md:self-center shrink-0">
                   {!isResolved && (
-                    <button
-                      onClick={() => resolveEmergencyRequest(req.id)}
-                      className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white transition-colors flex items-center gap-1"
-                    >
-                      <CheckCircle2 className="w-3.5 h-3.5" />
-                      <span>Mark Resolved</span>
-                    </button>
+                    role !== 'student' ? (
+                      <button
+                        onClick={() => resolveEmergencyRequest(req.id)}
+                        className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white transition-colors flex items-center gap-1 shadow-xs active:scale-95"
+                      >
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        <span>Mark Resolved</span>
+                      </button>
+                    ) : (
+                      <span className="text-[11px] font-mono text-slate-400 border border-slate-200 dark:border-slate-800 px-2 py-1 rounded">
+                        Active In Progress
+                      </span>
+                    )
                   )}
                 </div>
               </div>

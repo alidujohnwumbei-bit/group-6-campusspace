@@ -22,9 +22,20 @@ import {
   ExternalLink,
   RotateCcw,
   Sliders,
-  Check
+  Check,
+  UserPlus,
+  Lock,
+  CloudSun,
+  Sun,
+  CloudRain,
+  Wind,
+  Umbrella,
+  Glasses,
+  CalendarClock,
+  ShieldAlert,
+  X
 } from 'lucide-react';
-import { Classroom, RoomStatus, RoomType } from '../types';
+import { Classroom, RoomStatus, RoomType, UserRole } from '../types';
 
 interface AdminDashboardProps {
   onOpenBookingModal: () => void;
@@ -62,12 +73,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     updateCourse,
     deleteCourse,
     resetToDefaults,
+    weather,
+    setWeatherCondition
   } = useClassroom();
-  const { user } = useAuth();
+
+  const { user, registeredUsers, addNewUser, deleteUser } = useAuth();
 
   // Active Admin Subtab
   const [adminSection, setAdminSection] = useState<
-    'approvals' | 'classrooms' | 'av-fleet' | 'departments-faculty' | 'analytics'
+    'approvals' | 'classrooms' | 'reserved-rooms' | 'users' | 'weather-control' | 'av-fleet' | 'departments-faculty' | 'analytics'
   >('approvals');
 
   // Approvals filter
@@ -82,6 +96,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [editingStatus, setEditingStatus] = useState<RoomStatus>('available');
   const [editingAC, setEditingAC] = useState<Classroom['airConditioning']>('optimal');
   const [editingProjector, setEditingProjector] = useState<Classroom['projectorDisplay']>('dual-laser-4k');
+
+  // Add New User Form State
+  const [isAddingUser, setIsAddingUser] = useState(false);
+  const [newUserName, setNewUserName] = useState('');
+  const [newUserEmail, setNewUserEmail] = useState('');
+  const [newUserPassword, setNewUserPassword] = useState('');
+  const [newUserRole, setNewUserRole] = useState<UserRole>('student');
+  const [newUserDept, setNewUserDept] = useState('MATHS AND ICT');
+  const [newUserIdentifier, setNewUserIdentifier] = useState('');
+  const [userActionMessage, setUserActionMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   // New Department Form State
   const [isAddingDept, setIsAddingDept] = useState(false);
@@ -102,7 +126,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const totalClassrooms = classrooms.length;
   const occupiedCount = classrooms.filter(r => r.status === 'occupied').length;
   const availableCount = classrooms.filter(r => r.status === 'available').length;
-  const reservedCount = classrooms.filter(r => r.status === 'reserved').length;
+  const reservedRooms = classrooms.filter(r => r.status === 'reserved');
+  const reservedCount = reservedRooms.length; // 3/21
   const maintenanceCount = classrooms.filter(r => r.status === 'maintenance').length;
   const standbyCount = classrooms.filter(r => r.status === 'emergency-standby').length;
   const occupancyRate = Math.round(((occupiedCount + reservedCount) / totalClassrooms) * 100);
@@ -154,39 +179,39 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     setEditingRoomId(null);
   };
 
-  const handleCreateDepartment = (e: React.FormEvent) => {
+  const handleCreateUserSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newDeptName || !newDeptCode) return;
-    addDepartment({
-      name: newDeptName.toUpperCase(),
-      code: newDeptCode.toUpperCase(),
-      headOfDepartment: newDeptHead || 'Department Chair',
-      contactEmail: newDeptEmail || 'dept@ucc.edu.gh',
-      officeLocation: 'NLT Academic Block',
-      activeLecturersCount: 1,
-      assignedCoursesCount: 1,
+    setUserActionMessage(null);
+
+    const res = await addNewUser({
+      name: newUserName,
+      email: newUserEmail,
+      password: newUserPassword,
+      role: newUserRole,
+      department: newUserDept,
+      studentId: newUserRole === 'student' ? newUserIdentifier : undefined,
+      lecturerTitle: newUserRole === 'lecturer' ? newUserIdentifier : undefined,
     });
-    setIsAddingDept(false);
-    setNewDeptName('');
-    setNewDeptCode('');
+
+    if (res.success) {
+      setUserActionMessage({ type: 'success', text: res.message });
+      setIsAddingUser(false);
+      setNewUserName('');
+      setNewUserEmail('');
+      setNewUserPassword('');
+      setNewUserIdentifier('');
+    } else {
+      setUserActionMessage({ type: 'error', text: res.message });
+    }
   };
 
-  const handleCreateCourse = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newCourseCode || !newCourseName) return;
-    addCourse({
-      courseCode: newCourseCode.toUpperCase(),
-      courseName: newCourseName,
-      instructor: newCourseInstructor,
-      department: newCourseDept,
-      email: `${newCourseInstructor.toLowerCase().replace(/[^a-z]/g, '')}@campus.edu`,
-      creditHours: 3,
-      scheduledTime: 'Mon & Wed 10:00 - 12:00 PM',
-      defaultRoom: newCourseRoom,
-    });
-    setIsAddingCourse(false);
-    setNewCourseCode('');
-    setNewCourseName('');
+  const handleDeleteUserAccount = (id: string) => {
+    const res = deleteUser(id);
+    if (res.success) {
+      setUserActionMessage({ type: 'success', text: res.message });
+    } else {
+      setUserActionMessage({ type: 'error', text: res.message });
+    }
   };
 
   return (
@@ -198,20 +223,30 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           <div className="space-y-1.5">
             <div className="inline-flex items-center gap-2 px-2.5 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30 text-xs font-mono">
               <span className="w-2 h-2 rounded-full bg-purple-400 animate-pulse"></span>
-              <span>DIRECTORATE OF ACADEMIC AFFAIRS · ADMIN CONTROL</span>
+              <span>ADMINISTRATOR CONTROL CONSOLE · FULL SYSTEM ACCESS</span>
             </div>
             <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight">
               Facility &amp; Classroom Operations Hub
             </h1>
             <p className="text-xs sm:text-sm text-purple-200">
-              Logged in as <strong className="text-white">{user?.name || 'Administrator'}</strong> · Full Control over NLT1–NLT21, AV Equipment, Faculty &amp; Requests
+              Logged in as <strong className="text-white">{user?.name || 'Academic Affairs Admin'}</strong> · Manage All Rooms, Approve Requests, User Management &amp; Weather Control
             </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
             <button
-              onClick={onOpenBookingModal}
+              onClick={() => {
+                setAdminSection('users');
+                setIsAddingUser(true);
+              }}
               className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-xl bg-purple-600 hover:bg-purple-500 text-white shadow-sm transition-all active:scale-95"
+            >
+              <UserPlus className="w-4 h-4" />
+              <span>Add New User</span>
+            </button>
+            <button
+              onClick={onOpenBookingModal}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-xl bg-white/10 hover:bg-white/20 text-white border border-white/20 transition-all active:scale-95"
             >
               <Plus className="w-4 h-4" />
               <span>Admin Booking</span>
@@ -242,35 +277,35 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         </div>
 
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 rounded-xl shadow-xs">
-          <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">Classroom Utilization</div>
-          <div className="text-2xl font-bold font-mono text-indigo-600 dark:text-indigo-400 mt-1">
-            {occupancyRate}%
-          </div>
-          <div className="text-[11px] text-slate-400 mt-0.5">{occupiedCount + reservedCount} of {totalClassrooms} in session</div>
-        </div>
-
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 rounded-xl shadow-xs">
-          <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">Available NLT Rooms</div>
+          <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">Available Rooms</div>
           <div className="text-2xl font-bold font-mono text-emerald-600 dark:text-emerald-400 mt-1">
-            {availableCount}
+            {availableCount} / {totalClassrooms}
           </div>
-          <div className="text-[11px] text-slate-400 mt-0.5">Free for allocation</div>
+          <div className="text-[11px] text-slate-400 mt-0.5">Free for student / faculty use</div>
         </div>
 
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 rounded-xl shadow-xs">
-          <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">AV Fleet Health</div>
-          <div className="text-2xl font-bold font-mono text-sky-600 dark:text-sky-400 mt-1">
-            {avHealthPercent}%
+          <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">Reserved Rooms</div>
+          <div className="text-2xl font-bold font-mono text-amber-500 mt-1">
+            {reservedCount} / {totalClassrooms}
           </div>
-          <div className="text-[11px] text-slate-400 mt-0.5">{operationalMics} mics operational</div>
+          <div className="text-[11px] text-slate-400 mt-0.5">NLT3, NLT10, NLT17</div>
+        </div>
+
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 rounded-xl shadow-xs">
+          <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">Occupied Rooms</div>
+          <div className="text-2xl font-bold font-mono text-rose-600 dark:text-rose-400 mt-1">
+            {occupiedCount} / {totalClassrooms}
+          </div>
+          <div className="text-[11px] text-slate-400 mt-0.5">Active curriculum classes</div>
         </div>
 
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 rounded-xl shadow-xs col-span-2 lg:col-span-1">
-          <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">Active Emergencies</div>
-          <div className="text-2xl font-bold font-mono text-rose-600 dark:text-rose-400 mt-1">
-            {activeEmergencies.length}
+          <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">Registered Users</div>
+          <div className="text-2xl font-bold font-mono text-indigo-600 dark:text-indigo-400 mt-1">
+            {registeredUsers.length}
           </div>
-          <div className="text-[11px] text-slate-400 mt-0.5">{standbyCount} standby amphitheaters</div>
+          <div className="text-[11px] text-slate-400 mt-0.5">Encrypted auth accounts</div>
         </div>
       </div>
 
@@ -278,10 +313,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       <div className="flex items-center gap-1.5 p-1.5 bg-slate-100 dark:bg-slate-800/80 rounded-2xl overflow-x-auto border border-slate-200 dark:border-slate-700/60 scrollbar-thin">
         {[
           { id: 'approvals', label: 'Approvals Hub', count: totalPendingApprovals, icon: CheckCircle2 },
-          { id: 'classrooms', label: 'Manage Classrooms (NLT1-21)', count: totalClassrooms, icon: Building2 },
-          { id: 'av-fleet', label: 'Manage AV Fleet', count: totalMics, icon: Mic },
-          { id: 'departments-faculty', label: 'Departments & Faculty', count: departments.length, icon: Users },
-          { id: 'analytics', label: 'Campus Analytics', icon: BarChart3 },
+          { id: 'classrooms', label: 'All Classrooms (21)', count: totalClassrooms, icon: Building2 },
+          { id: 'reserved-rooms', label: 'Reserved Rooms (3/21)', count: reservedCount, icon: CalendarClock },
+          { id: 'users', label: 'Manage Users & Add User', count: registeredUsers.length, icon: Users },
+          { id: 'weather-control', label: 'Weather Console', icon: CloudSun },
+          { id: 'av-fleet', label: 'AV Gear Fleet', count: totalMics, icon: Mic },
+          { id: 'departments-faculty', label: 'Departments & Faculty', count: departments.length, icon: BookOpen },
+          { id: 'analytics', label: 'Analytics', icon: BarChart3 },
         ].map((sec) => {
           const Icon = sec.icon;
           const isActive = adminSection === sec.id;
@@ -309,7 +347,379 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         })}
       </div>
 
-      {/* 4. TAB CONTENT: APPROVALS HUB */}
+      {/* Notifications from user actions */}
+      {userActionMessage && (
+        <div className={`p-3 rounded-xl border text-xs flex items-center justify-between gap-2 animate-in fade-in ${
+          userActionMessage.type === 'success' 
+            ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-300 text-emerald-800 dark:text-emerald-300' 
+            : 'bg-rose-50 dark:bg-rose-950/40 border-rose-300 text-rose-800 dark:text-rose-300'
+        }`}>
+          <span>{userActionMessage.text}</span>
+          <button onClick={() => setUserActionMessage(null)} className="text-slate-400 hover:text-slate-800">
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
+
+      {/* 4. TAB CONTENT: MANAGE USERS & ADD NEW USER (Strictly Admin Feature) */}
+      {adminSection === 'users' && (
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-xs space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-200 dark:border-slate-800">
+            <div>
+              <h2 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                <Users className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                <span>User Management &amp; Encrypted Account Directory</span>
+              </h2>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                Create new student, faculty, or administrator accounts with encrypted password storage in localStorage
+              </p>
+            </div>
+
+            <button
+              onClick={() => setIsAddingUser(!isAddingUser)}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-xl bg-purple-600 hover:bg-purple-700 text-white shadow-xs transition-all"
+            >
+              <UserPlus className="w-3.5 h-3.5" />
+              <span>{isAddingUser ? 'Close Form' : 'Add New User'}</span>
+            </button>
+          </div>
+
+          {/* Add New User Form */}
+          {isAddingUser && (
+            <form onSubmit={handleCreateUserSubmit} className="p-5 rounded-2xl bg-purple-50/50 dark:bg-purple-950/20 border border-purple-200 dark:border-purple-800/80 space-y-4 text-xs animate-in fade-in duration-150">
+              <div className="font-bold text-sm text-purple-900 dark:text-purple-200 flex items-center gap-2">
+                <UserPlus className="w-4 h-4 text-purple-600" />
+                <span>Register New Campus Account</span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                <div>
+                  <label className="block font-semibold mb-1 text-slate-700 dark:text-slate-300">
+                    Full Name:
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Dr. Frank Osei or Sarah Baah"
+                    value={newUserName}
+                    onChange={(e) => setNewUserName(e.target.value)}
+                    required
+                    className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-semibold mb-1 text-slate-700 dark:text-slate-300">
+                    Institutional Email:
+                  </label>
+                  <input
+                    type="email"
+                    placeholder="name@campus.edu"
+                    value={newUserEmail}
+                    onChange={(e) => setNewUserEmail(e.target.value)}
+                    required
+                    className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-semibold mb-1 text-slate-700 dark:text-slate-300">
+                    Password (min 6 characters):
+                  </label>
+                  <input
+                    type="password"
+                    placeholder="••••••••"
+                    value={newUserPassword}
+                    onChange={(e) => setNewUserPassword(e.target.value)}
+                    required
+                    minLength={6}
+                    className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-semibold mb-1 text-slate-700 dark:text-slate-300">
+                    Access Role:
+                  </label>
+                  <select
+                    value={newUserRole}
+                    onChange={(e) => setNewUserRole(e.target.value as UserRole)}
+                    className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white capitalize"
+                  >
+                    <option value="student">Student (Available rooms, book, timetable)</option>
+                    <option value="lecturer">Lecturer / Faculty (Check-in, Report issues, Book)</option>
+                    <option value="admin">Administrator (Full control, approvals, users)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block font-semibold mb-1 text-slate-700 dark:text-slate-300">
+                    Department:
+                  </label>
+                  <select
+                    value={newUserDept}
+                    onChange={(e) => setNewUserDept(e.target.value)}
+                    className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white"
+                  >
+                    {departments.map((d) => (
+                      <option key={d.id} value={d.name}>{d.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block font-semibold mb-1 text-slate-700 dark:text-slate-300">
+                    Student ID / Faculty Title:
+                  </label>
+                  <input
+                    type="text"
+                    placeholder={newUserRole === 'student' ? 'e.g. STU-2026-099' : 'e.g. Senior Lecturer'}
+                    value={newUserIdentifier}
+                    onChange={(e) => setNewUserIdentifier(e.target.value)}
+                    className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsAddingUser(false)}
+                  className="px-4 py-2 rounded-xl text-slate-600 hover:text-slate-900 dark:text-slate-400"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-semibold flex items-center gap-1.5 shadow-sm"
+                >
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  <span>Encrypt &amp; Create Account</span>
+                </button>
+              </div>
+            </form>
+          )}
+
+          {/* User Directory Table */}
+          <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
+            <table className="min-w-full text-xs text-left">
+              <thead className="bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-semibold border-b border-slate-200 dark:border-slate-800 uppercase tracking-wider text-[10px]">
+                <tr>
+                  <th className="px-4 py-3">User</th>
+                  <th className="px-4 py-3">Role</th>
+                  <th className="px-4 py-3">Department</th>
+                  <th className="px-4 py-3">ID / Title</th>
+                  <th className="px-4 py-3">Security Storage</th>
+                  <th className="px-4 py-3 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
+                {registeredUsers.map((u) => (
+                  <tr key={u.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2.5">
+                        <img 
+                          src={u.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80'} 
+                          alt={u.name}
+                          className="w-7 h-7 rounded-full object-cover border border-slate-200 shrink-0" 
+                        />
+                        <div>
+                          <div className="font-bold text-slate-900 dark:text-white">{u.name}</div>
+                          <div className="text-[11px] text-slate-500 font-mono">{u.email}</div>
+                        </div>
+                      </div>
+                    </td>
+
+                    <td className="px-4 py-3">
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase ${
+                        u.role === 'admin' 
+                          ? 'bg-purple-100 dark:bg-purple-950 text-purple-800 dark:text-purple-300' 
+                          : u.role === 'lecturer'
+                          ? 'bg-sky-100 dark:bg-sky-950 text-sky-800 dark:text-sky-300'
+                          : 'bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300'
+                      }`}>
+                        {u.role}
+                      </span>
+                    </td>
+
+                    <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
+                      {u.department}
+                    </td>
+
+                    <td className="px-4 py-3 text-slate-500 font-mono">
+                      {u.studentId || u.lecturerTitle || '—'}
+                    </td>
+
+                    <td className="px-4 py-3 text-emerald-600 dark:text-emerald-400 font-mono text-[11px] flex items-center gap-1">
+                      <Lock className="w-3 h-3" />
+                      <span>SHA-256 Hashed</span>
+                    </td>
+
+                    <td className="px-4 py-3 text-right">
+                      {u.email !== 'admin@campus.edu' ? (
+                        <button
+                          onClick={() => handleDeleteUserAccount(u.id)}
+                          className="p-1 rounded text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40"
+                          title="Remove user account"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      ) : (
+                        <span className="text-[10px] text-slate-400 italic">Protected</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* 5. TAB CONTENT: RESERVED ROOMS (3/21) */}
+      {adminSection === 'reserved-rooms' && (
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-xs space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-200 dark:border-slate-800">
+            <div>
+              <h2 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                <CalendarClock className="w-4 h-4 text-amber-500" />
+                <span>Reserved Classrooms ({reservedRooms.length}/21)</span>
+              </h2>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                Classroom halls locked for upcoming scheduled seminars, probability workshops, and corporate lectures
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {reservedRooms.map((room) => {
+              const session = room.currentSession;
+              return (
+                <div
+                  key={room.id}
+                  className="p-4 rounded-xl border border-amber-300 dark:border-amber-800/80 bg-amber-50/30 dark:bg-amber-950/20 space-y-3 text-xs"
+                >
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <span className="font-mono font-bold text-sm px-2 py-0.5 rounded bg-amber-100 dark:bg-amber-900/60 text-amber-800 dark:text-amber-300">
+                        {room.code}
+                      </span>
+                      <h3 className="font-bold text-sm text-slate-900 dark:text-white mt-1.5">
+                        {session?.courseCode}: {session?.courseName}
+                      </h3>
+                    </div>
+                    <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-amber-500 text-slate-950 uppercase">
+                      Reserved
+                    </span>
+                  </div>
+
+                  <div className="space-y-1 text-slate-600 dark:text-slate-300">
+                    <div>Instructor: <strong className="text-slate-900 dark:text-white">{session?.instructor}</strong></div>
+                    <div>Department: <span>{session?.department}</span></div>
+                    <div className="font-mono text-[11px] text-slate-500">
+                      ⏰ Scheduled: {session?.startTime} - {session?.endTime}
+                    </div>
+                    <div className="font-mono text-[11px] text-slate-500">
+                      Expected Attendance: {session?.attendeeCount} / {room.capacity} seats
+                    </div>
+                    {session?.bookingRef && (
+                      <div className="text-[10px] font-mono text-amber-700 dark:text-amber-300">
+                        Booking Ref: {session.bookingRef}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="pt-2.5 border-t border-amber-200 dark:border-amber-900/60 flex items-center justify-between">
+                    <button
+                      onClick={() => updateClassroom(room.id, { status: 'available', currentSession: undefined })}
+                      className="text-xs text-rose-600 hover:underline font-medium"
+                    >
+                      Release Reservation
+                    </button>
+                    <button
+                      onClick={() => updateClassroom(room.id, { status: 'occupied' })}
+                      className="text-xs text-emerald-600 hover:underline font-semibold"
+                    >
+                      Check-In / Set Occupied
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* 6. TAB CONTENT: WEATHER CONTROL CONSOLE */}
+      {adminSection === 'weather-control' && (
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-xs space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-200 dark:border-slate-800">
+            <div>
+              <h2 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                <CloudSun className="w-4 h-4 text-amber-500" />
+                <span>Campus Weather Station &amp; Advisory Control</span>
+              </h2>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                Simulate or set real-time meteorological conditions to trigger smart student/faculty advisories
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            {[
+              { 
+                cond: 'warm' as const, 
+                title: '☀️ Warm & Heat (33°C)', 
+                advisory: 'Suggests Umbrella for sun shade & heat protection',
+                color: 'amber' 
+              },
+              { 
+                cond: 'raining' as const, 
+                title: '🌧️ Heavy Rain (22°C)', 
+                advisory: 'Suggests Umbrella for rain & wet walkway protection',
+                color: 'sky' 
+              },
+              { 
+                cond: 'windy' as const, 
+                title: '💨 Windy & Dust (27°C)', 
+                advisory: 'Suggests Nose Mask with Specks against airborne dust',
+                color: 'teal' 
+              },
+              { 
+                cond: 'mild' as const, 
+                title: '⛅ Mild & Pleasant (25°C)', 
+                advisory: 'Clear campus weather status badge',
+                color: 'indigo' 
+              },
+            ].map((w) => {
+              const isActive = weather.condition === w.cond;
+              return (
+                <button
+                  key={w.cond}
+                  onClick={() => setWeatherCondition(w.cond)}
+                  className={`p-4 rounded-xl border text-left transition-all ${
+                    isActive
+                      ? 'border-indigo-600 ring-2 ring-indigo-500/30 bg-indigo-50/50 dark:bg-indigo-950/40 shadow-sm'
+                      : 'border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 bg-slate-50/40 dark:bg-slate-800/30'
+                  }`}
+                >
+                  <div className="font-bold text-sm text-slate-900 dark:text-white">{w.title}</div>
+                  <div className="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
+                    {w.advisory}
+                  </div>
+                  {isActive && (
+                    <div className="mt-3 text-[10px] font-bold text-indigo-600 dark:text-indigo-400 uppercase font-mono flex items-center gap-1">
+                      <Check className="w-3.5 h-3.5" />
+                      <span>Active Advisory on Campus Bar</span>
+                    </div>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* 7. TAB CONTENT: APPROVALS HUB (Existing) */}
       {adminSection === 'approvals' && (
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-xs space-y-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-200 dark:border-slate-800">
@@ -423,7 +833,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         )}
                       </div>
 
-                      {/* Optional Note input */}
                       {req.status === 'pending' && (
                         <div className="mt-2.5">
                           <input
@@ -461,7 +870,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                             ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300'
                             : 'bg-rose-100 dark:bg-rose-950 text-rose-800 dark:text-rose-300'
                         }`}>
-                          {req.status === 'approved' ? <CheckCircle2 className="w-3.5 h-3.5" /> : <XCircle className="w-3.5 h-3.5" />}
+                          <CheckCircle2 className="w-3.5 h-3.5" />
                           <span className="capitalize">{req.status}</span>
                         </span>
                       )}
@@ -561,73 +970,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </div>
             )}
 
-            {/* 3. Classroom Swaps */}
-            {(approvalsCategory === 'all' || approvalsCategory === 'swap') && (
-              <div className="space-y-3 pt-3 border-t border-slate-200 dark:border-slate-800">
-                <div className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-                  <ArrowLeftRight className="w-3.5 h-3.5" />
-                  <span>Faculty Classroom Swap Proposals</span>
-                </div>
-
-                {swapRequests.map((s) => (
-                  <div
-                    key={s.id}
-                    className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40 flex flex-col lg:flex-row lg:items-center justify-between gap-4"
-                  >
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-sm text-slate-900 dark:text-white">
-                          {s.requesterLecturer} ({s.requesterRoomCode}) &harr; {s.targetLecturer} ({s.targetRoomCode})
-                        </span>
-                        <span className="font-mono text-[10px] px-2 py-0.5 rounded bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-300">
-                          #{s.requestNumber}
-                        </span>
-                      </div>
-
-                      <div className="text-xs text-slate-700 dark:text-slate-300 mt-1">
-                        Courses: {s.requesterCourseCode} ({s.requesterCourseName}) &harr; {s.targetCourseCode} ({s.targetCourseName})
-                      </div>
-
-                      <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 font-mono">
-                        📅 Date: {s.date} · ⏰ {s.timeSlot} · Reason: &quot;{s.reason}&quot;
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2 self-start lg:self-center shrink-0">
-                      {s.status === 'pending' ? (
-                        <>
-                          <button
-                            onClick={() => updateSwapRequestStatus(s.id, 'approved', 'Authorized by Central Facilities Admin.')}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white transition-all shadow-xs"
-                          >
-                            <CheckCircle2 className="w-3.5 h-3.5" />
-                            <span>Authorize Swap</span>
-                          </button>
-                          <button
-                            onClick={() => updateSwapRequestStatus(s.id, 'rejected', 'Room swap declined by Administrator.')}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-rose-600 hover:bg-rose-700 text-white transition-all shadow-xs"
-                          >
-                            <XCircle className="w-3.5 h-3.5" />
-                            <span>Decline</span>
-                          </button>
-                        </>
-                      ) : (
-                        <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold ${
-                          s.status === 'approved'
-                            ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300'
-                            : 'bg-rose-100 dark:bg-rose-950 text-rose-800 dark:text-rose-300'
-                        }`}>
-                          <CheckCircle2 className="w-3.5 h-3.5" />
-                          <span className="capitalize">{s.status}</span>
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* 4. Emergency Requests */}
+            {/* 3. Emergency Requests */}
             {(approvalsCategory === 'all' || approvalsCategory === 'emergency') && (
               <div className="space-y-3 pt-3 border-t border-slate-200 dark:border-slate-800">
                 <div className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
@@ -689,7 +1032,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         </div>
       )}
 
-      {/* 5. TAB CONTENT: MANAGE CLASSROOMS (NLT1-21) */}
+      {/* 8. TAB CONTENT: ALL CLASSROOMS (NLT1-21) */}
       {adminSection === 'classrooms' && (
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-xs space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-200 dark:border-slate-800">
@@ -861,7 +1204,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         </div>
       )}
 
-      {/* 6. TAB CONTENT: MANAGE AV FLEET */}
+      {/* 9. TAB CONTENT: AV GEAR FLEET (Existing) */}
       {adminSection === 'av-fleet' && (
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-xs space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-200 dark:border-slate-800">
@@ -942,10 +1285,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         </div>
       )}
 
-      {/* 7. TAB CONTENT: DEPARTMENTS & FACULTY */}
+      {/* 10. TAB CONTENT: DEPARTMENTS & FACULTY (Existing) */}
       {adminSection === 'departments-faculty' && (
         <div className="space-y-6">
-          {/* Departments Manager */}
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-xs">
             <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
               <div>
@@ -954,86 +1296,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   <span>Academic Departments ({departments.length})</span>
                 </h3>
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                  Manage academic units across Maths &amp; ICT, Vocational, Statistics, and Business
+                  Maths &amp; ICT, Vocational, Statistics, and School of Business
                 </p>
               </div>
-
-              <button
-                onClick={() => setIsAddingDept(!isAddingDept)}
-                className="px-3 py-1.5 text-xs font-semibold rounded-xl bg-purple-600 hover:bg-purple-700 text-white flex items-center gap-1.5"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>Add Department</span>
-              </button>
             </div>
 
-            {/* Add Department Form */}
-            {isAddingDept && (
-              <form onSubmit={handleCreateDepartment} className="mt-4 p-4 rounded-xl bg-purple-50/50 dark:bg-purple-950/20 border border-purple-200 dark:border-purple-800 space-y-3 text-xs">
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                  <div>
-                    <label className="block font-semibold mb-1">Department Name:</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. FACULTY OF ARTS"
-                      value={newDeptName}
-                      onChange={(e) => setNewDeptName(e.target.value)}
-                      className="w-full px-3 py-1.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="block font-semibold mb-1">Code:</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. ARTS"
-                      value={newDeptCode}
-                      onChange={(e) => setNewDeptCode(e.target.value)}
-                      className="w-full px-3 py-1.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="block font-semibold mb-1">Head of Department:</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. Prof. Mensah"
-                      value={newDeptHead}
-                      onChange={(e) => setNewDeptHead(e.target.value)}
-                      className="w-full px-3 py-1.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white"
-                    />
-                  </div>
-                  <div>
-                    <label className="block font-semibold mb-1">Email:</label>
-                    <input
-                      type="email"
-                      placeholder="arts@ucc.edu.gh"
-                      value={newDeptEmail}
-                      onChange={(e) => setNewDeptEmail(e.target.value)}
-                      className="w-full px-3 py-1.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white"
-                    />
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-end gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setIsAddingDept(false)}
-                    className="px-3 py-1 rounded text-slate-600 hover:text-slate-900"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-3 py-1 rounded bg-purple-600 text-white font-semibold"
-                  >
-                    Save Department
-                  </button>
-                </div>
-              </form>
-            )}
-
-            {/* Department Cards */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mt-4">
               {departments.map((d) => (
                 <div
@@ -1054,160 +1321,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   <div className="text-[11px] text-slate-500 font-mono">
                     {d.contactEmail}
                   </div>
-                  <div className="text-[11px] text-slate-400">
-                    Location: {d.officeLocation}
-                  </div>
                 </div>
               ))}
-            </div>
-          </div>
-
-          {/* Lecturers & Courses Manager */}
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-xs">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
-              <div>
-                <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                  <BookOpen className="w-4 h-4 text-indigo-600" />
-                  <span>Curriculum Courses &amp; Assigned Lecturers ({courses.length})</span>
-                </h3>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                  Manage instructors, course codes, departments, and default NLT classrooms
-                </p>
-              </div>
-
-              <button
-                onClick={() => setIsAddingCourse(!isAddingCourse)}
-                className="px-3 py-1.5 text-xs font-semibold rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white flex items-center gap-1.5"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>Add Course</span>
-              </button>
-            </div>
-
-            {/* Add Course Form */}
-            {isAddingCourse && (
-              <form onSubmit={handleCreateCourse} className="mt-4 p-4 rounded-xl bg-indigo-50/50 dark:bg-indigo-950/20 border border-indigo-200 dark:border-indigo-800 space-y-3 text-xs">
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-                  <div>
-                    <label className="block font-semibold mb-1">Course Code:</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. EIT315"
-                      value={newCourseCode}
-                      onChange={(e) => setNewCourseCode(e.target.value)}
-                      className="w-full px-3 py-1.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white uppercase font-mono"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="block font-semibold mb-1">Course Name:</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. Cyber Security"
-                      value={newCourseName}
-                      onChange={(e) => setNewCourseName(e.target.value)}
-                      className="w-full px-3 py-1.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="block font-semibold mb-1">Lecturer:</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. Dr Adane"
-                      value={newCourseInstructor}
-                      onChange={(e) => setNewCourseInstructor(e.target.value)}
-                      className="w-full px-3 py-1.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white"
-                    />
-                  </div>
-                  <div>
-                    <label className="block font-semibold mb-1">Department:</label>
-                    <select
-                      value={newCourseDept}
-                      onChange={(e) => setNewCourseDept(e.target.value)}
-                      className="w-full px-3 py-1.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white"
-                    >
-                      {departments.map((d) => (
-                        <option key={d.id} value={d.name}>{d.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block font-semibold mb-1">Default Hall:</label>
-                    <select
-                      value={newCourseRoom}
-                      onChange={(e) => setNewCourseRoom(e.target.value)}
-                      className="w-full px-3 py-1.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white font-mono"
-                    >
-                      {classrooms.map((r) => (
-                        <option key={r.id} value={r.code}>{r.code}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-end gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setIsAddingCourse(false)}
-                    className="px-3 py-1 rounded text-slate-600 hover:text-slate-900"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-3 py-1 rounded bg-indigo-600 text-white font-semibold"
-                  >
-                    Save Course
-                  </button>
-                </div>
-              </form>
-            )}
-
-            {/* Courses Table */}
-            <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800 mt-4">
-              <table className="min-w-full text-xs text-left">
-                <thead className="bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-semibold border-b border-slate-200 dark:border-slate-800 uppercase text-[10px]">
-                  <tr>
-                    <th className="px-4 py-2.5">Course Code</th>
-                    <th className="px-4 py-2.5">Course Name</th>
-                    <th className="px-4 py-2.5">Assigned Lecturer</th>
-                    <th className="px-4 py-2.5">Department</th>
-                    <th className="px-4 py-2.5">Designated Hall</th>
-                    <th className="px-4 py-2.5">Schedule</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
-                  {courses.map((c) => (
-                    <tr key={c.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
-                      <td className="px-4 py-2.5 font-mono font-bold text-indigo-600 dark:text-indigo-400">
-                        {c.courseCode}
-                      </td>
-                      <td className="px-4 py-2.5 font-semibold text-slate-900 dark:text-white">
-                        {c.courseName}
-                      </td>
-                      <td className="px-4 py-2.5 text-slate-800 dark:text-slate-200 font-medium">
-                        {c.instructor}
-                      </td>
-                      <td className="px-4 py-2.5 text-slate-600 dark:text-slate-400">
-                        {c.department}
-                      </td>
-                      <td className="px-4 py-2.5 font-mono font-bold text-amber-600 dark:text-amber-400">
-                        {c.defaultRoom}
-                      </td>
-                      <td className="px-4 py-2.5 text-slate-500 font-mono text-[11px]">
-                        {c.scheduledTime}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
             </div>
           </div>
         </div>
       )}
 
-      {/* 8. TAB CONTENT: ANALYTICS */}
+      {/* 11. TAB CONTENT: ANALYTICS (Existing) */}
       {adminSection === 'analytics' && (
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-xs space-y-6">
           <div className="pb-3 border-b border-slate-200 dark:border-slate-800">
@@ -1221,7 +1342,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {/* Level 1 Utilization */}
             <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30">
               <div className="text-xs font-bold text-slate-500 dark:text-slate-400">Level 1 (NLT1 to NLT7)</div>
               <div className="text-xl font-bold font-mono text-indigo-600 dark:text-indigo-400 mt-1">
@@ -1230,10 +1350,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               <div className="w-full bg-slate-200 dark:bg-slate-700 h-2 rounded-full overflow-hidden mt-2">
                 <div className="bg-indigo-600 h-full rounded-full" style={{ width: '71%' }}></div>
               </div>
-              <div className="text-[11px] text-slate-400 mt-2">Features 250-seat Amphitheater (NLT1, NLT7 Standby)</div>
             </div>
 
-            {/* Level 2 Utilization */}
             <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30">
               <div className="text-xs font-bold text-slate-500 dark:text-slate-400">Level 2 (NLT8 to NLT14)</div>
               <div className="text-xl font-bold font-mono text-purple-600 dark:text-purple-400 mt-1">
@@ -1242,10 +1360,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               <div className="w-full bg-slate-200 dark:bg-slate-700 h-2 rounded-full overflow-hidden mt-2">
                 <div className="bg-purple-600 h-full rounded-full" style={{ width: '57%' }}></div>
               </div>
-              <div className="text-[11px] text-slate-400 mt-2">NLT14 in maintenance; NLT12 Food &amp; Nutrition</div>
             </div>
 
-            {/* Level 3 Utilization */}
             <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30">
               <div className="text-xs font-bold text-slate-500 dark:text-slate-400">Level 3 (NLT15 to NLT21)</div>
               <div className="text-xl font-bold font-mono text-emerald-600 dark:text-emerald-400 mt-1">
@@ -1254,7 +1370,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               <div className="w-full bg-slate-200 dark:bg-slate-700 h-2 rounded-full overflow-hidden mt-2">
                 <div className="bg-emerald-600 h-full rounded-full" style={{ width: '85%' }}></div>
               </div>
-              <div className="text-[11px] text-slate-400 mt-2">High demand for Statistics &amp; Business accounting</div>
             </div>
           </div>
         </div>
